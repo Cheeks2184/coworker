@@ -218,7 +218,7 @@ Use the \`web.search\` tool whenever the request needs current or externally ver
 - Openly distinguish facts found in results from your own inference.
 - Include the source URLs in the response.
 - The app automatically chooses an available configured provider. A requested provider may fall back to another configured provider.
-- If no provider is configured, tell the user to add a Firecrawl, Tavily, Exa, or SerpAPI key in Settings → Skills.
+- If no provider is configured, tell the user to add a Firecrawl, Tavily, Exa, or SerpAPI key in Settings → Web search.
 `,
   sourceUrl: null,
   bundled: true,

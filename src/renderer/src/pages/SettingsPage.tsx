@@ -33,10 +33,21 @@ import { MessagingConnections } from "../components/MessagingConnections";
 export type SettingsTab =
   | "general"
   | "models"
+  | "web-search"
   | "skills"
   | "integrations"
   | "archived"
   | "data";
+
+const settingsTabLabels: Record<SettingsTab, string> = {
+  general: "General",
+  models: "Models",
+  "web-search": "Web search",
+  skills: "Skills",
+  integrations: "Channels",
+  archived: "Archived",
+  data: "Data",
+};
 
 function bytesToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -78,7 +89,7 @@ export function SettingsPage({
   const [unreadableKeys, setUnreadableKeys] = useState<string[]>([]);
   const [credentialsLoaded, setCredentialsLoaded] = useState(false);
   const [modelProvider, setModelProvider] = useState<RemoteModelProvider | "add-endpoint">(
-    "anthropic",
+    "openrouter",
   );
   const [makeDefaultModel, setMakeDefaultModel] = useState(true);
   const [defaultModelChoice, setDefaultModelChoice] = useState("");
@@ -92,9 +103,9 @@ export function SettingsPage({
   const [discordStatuses, setDiscordStatuses] = useState<DiscordIntegrationStatus[]>([]);
   const [confirmingArchivedDelete, setConfirmingArchivedDelete] = useState<string | null>(null);
 
-  const knownProviderCards = remoteModelProviderDefinitions.filter(
-    (provider) => provider.id !== "openai-compatible",
-  );
+  const knownProviderCards = remoteModelProviderDefinitions
+    .filter((provider) => provider.id !== "openai-compatible")
+    .sort((left, right) => Number(right.id === "openrouter") - Number(left.id === "openrouter"));
   const addingEndpoint = modelProvider === "add-endpoint";
   const activeProvider = addingEndpoint ? null : modelProvider;
   const selectedEndpoint = activeProvider
@@ -338,7 +349,7 @@ export function SettingsPage({
     setNotice(null);
     try {
       await window.coworker.integrations.removeModelEndpoint(endpoint.id);
-      setModelProvider("anthropic");
+      setModelProvider("openrouter");
       await onChanged();
       setNoticeKind("success");
       setNotice(`${endpoint.name} was removed.`);
@@ -572,15 +583,14 @@ export function SettingsPage({
       <PageHeader
         eyebrow="Workroom controls"
         title="Settings"
-        description="Manage local behavior, model access, integrations, and data."
+        description="Manage local behavior, model access, channels, and data."
       />
 
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
-          {(["general", "models", "skills", "integrations", "archived", "data"] as SettingsTab[]).map((item) => (
+          {(Object.keys(settingsTabLabels) as SettingsTab[]).map((item) => (
             <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>
-              {item[0]?.toUpperCase()}
-              {item.slice(1)}
+              {settingsTabLabels[item]}
             </button>
           ))}
         </nav>
@@ -733,13 +743,7 @@ export function SettingsPage({
 
           {tab === "models" ? (
             <section className="settings-section">
-              <span className="eyebrow">Reasoning providers</span>
-              <h2>Model credentials</h2>
-              <p>
-                Keys and endpoint settings are encrypted through the operating system. They are
-                never returned to the renderer or written as plaintext in SQLite. Model access is
-                verified before the configuration is saved.
-              </p>
+              <h2>LLM Providers</h2>
               <div className="provider-grid model-provider-grid">
                 {knownProviderCards.map((provider) => (
                   <button
@@ -999,8 +1003,13 @@ export function SettingsPage({
                   </article>
                 ))}
               </div>
+            </section>
+          ) : null}
 
-              <span className="eyebrow skills-provider-eyebrow">Web search credentials</span>
+          {tab === "web-search" ? (
+            <section className="settings-section">
+              <span className="eyebrow">Web search</span>
+              <h2>Search providers</h2>
               <p>The web-search skill automatically uses the first configured provider available.</p>
               <div className="provider-grid model-provider-grid">
                 {webSearchProviders.map((provider) => (
@@ -1064,7 +1073,6 @@ export function SettingsPage({
 
           {tab === "integrations" ? (
             <section className="settings-section">
-              <span className="eyebrow">Controlled adapters</span>
               <h2>Email delivery</h2>
               <p>
                 Local outbox writes an auditable .eml file. Resend performs a real send only after
@@ -1319,12 +1327,12 @@ function credentialLocation(key: string): {
   if (webSearch) {
     return {
       label: `${providerLabel(webSearch)} web search key`,
-      tab: "skills",
-      tabLabel: "Skills",
+      tab: "web-search",
+      tabLabel: "Web search",
     };
   }
   if (key === "integration:email:resend") {
-    return { label: "Resend email key", tab: "integrations", tabLabel: "Integrations" };
+    return { label: "Resend email key", tab: "integrations", tabLabel: "Channels" };
   }
   const model = remoteModelProviderDefinitions.find(
     (provider) =>

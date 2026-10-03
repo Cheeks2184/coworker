@@ -102,6 +102,6 @@ On upgrade, existing bots stay paired and future messages start in fresh bot-spe
 
 ### Messaging configuration
 
-Each coworker can connect one Telegram bot and one Discord bot. Configure them in the coworker’s settings or in the global **Settings → Integrations** page; both views manage the same connections. Messaging changes save independently of the coworker’s other settings. Unpairing keeps the platform slot occupied; disconnecting frees it. Conversations started on desktop remain local, while conversations started through a bot sync with that bot.
+Each coworker can connect one Telegram bot and one Discord bot. Configure them in the coworker’s settings or in the global **Settings → Channels** page; both views manage the same connections. Messaging changes save independently of the coworker’s other settings. Unpairing keeps the platform slot occupied; disconnecting frees it. Conversations started on desktop remain local, while conversations started through a bot sync with that bot.
 
 If an older profile has several active bots on the same platform for one coworker, the upgrade pauses those conflicting connections and keeps their credentials, pairings, and history. Reconnect the desired bot or move a bot to a coworker with a free slot. Reconnecting a paused bot can reuse its stored token; explicitly disconnecting it removes that token.

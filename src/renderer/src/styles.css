@@ -2564,11 +2564,16 @@ select:focus {
   font-weight: 670;
 }
 
+.model-selector {
+  display: grid;
+  gap: 8px;
+}
+
 .model-selector-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 6px;
+  gap: 8px;
 }
 
 .model-selector-search {
@@ -3020,19 +3025,20 @@ select:focus {
   border-radius: 999px;
 }
 
-.skills-provider-eyebrow {
-  display: block;
-  margin-top: 22px;
-}
-
 .credential-default-model {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 16px 18px;
   background: var(--cloud);
   border: 1px solid var(--line);
   border-radius: 10px;
+}
+
+/* Separates the model choice from the toggle that reveals it. */
+.credential-default-model .settings-row + * {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 /* .inline-credential-form label forces a centered column; restore the row. */
@@ -7197,8 +7203,9 @@ select:focus {
 }
 
 .model-credential-form {
+  gap: 14px;
   margin-bottom: 24px;
-  padding: 15px;
+  padding: 18px 20px;
   background: color-mix(in srgb, var(--white) 62%, transparent);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -7229,8 +7236,7 @@ select:focus {
   display: flex;
   width: 100%;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 4px;
+  gap: 3px;
 }
 
 .credential-form-heading strong {

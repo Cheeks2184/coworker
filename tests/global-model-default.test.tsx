@@ -234,12 +234,13 @@ describe("global model default", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Models" }));
+    // OpenRouter leads the provider cards and starts selected.
+    const providerCards = screen.getAllByRole("button", { name: /Not connected$/ });
+    expect(providerCards[0]?.textContent).toContain("OpenRouter");
     const openRouter = screen.getByRole("button", { name: "OpenRouter Not connected" });
-    expect(openRouter.getAttribute("aria-pressed")).toBe("false");
+    expect(openRouter.getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByRole("combobox", { name: "Model provider" })).toBeNull();
 
-    fireEvent.click(openRouter);
-    expect(openRouter.getAttribute("aria-pressed")).toBe("true");
     fireEvent.change(screen.getByLabelText("OpenRouter API key"), {
       target: { value: "router-key" },
     });

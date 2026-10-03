@@ -731,13 +731,13 @@ export class DiscordBridgeService {
     this.options.database.addActivity({
       type: "discord.refused",
       summary:
-        "Refused a Discord message from an unpaired channel — post the pairing code from Settings → Integrations in the channel or thread you want",
+        "Refused a Discord message from an unpaired channel — post the pairing code from Settings → Channels in the channel or thread you want",
     });
     this.options.emit({ type: "entity.changed", entity: "activity" });
     if (!this.looksLikePairingAttempt(text)) return;
     await this.sendPlain(
       channelId,
-      "This bot is private. To connect, invite it from Coworker's Settings → Integrations, then post the pairing code shown there in this channel or thread.",
+      "This bot is private. To connect, invite it from Coworker's Settings → Channels, then post the pairing code shown there in this channel or thread.",
     );
   }
 

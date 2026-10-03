@@ -39,4 +39,4 @@ Do not call it for a normal reply in a conversation: the app already mirrors con
 
 - Photos up to 10 MB send as pictures; every other file up to 50 MB sends as a document. Larger files fail — say so and offer an alternative.
 - The message goes to the selected bot’s paired chat or mapped topic. You cannot message anyone else on Telegram.
-- If the tool reports that Telegram is not connected or paired, tell the user to connect it in the coworker’s settings or Settings → Integrations and stop; do not retry.
+- If the tool reports that Telegram is not connected or paired, tell the user to connect it in the coworker’s settings or Settings → Channels and stop; do not retry.
