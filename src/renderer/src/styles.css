@@ -1188,6 +1188,52 @@ svg {
   mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
 
+/* In the feed a file is one compact row, with its actions on the right, so it
+   fits the short preview. */
+.team-card-content .chat-artifact-card {
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  max-width: 460px;
+  padding: 7px 9px;
+  box-shadow: none;
+}
+
+.team-card-content .chat-artifact-icon {
+  width: 30px;
+  height: 34px;
+}
+
+.team-card-content .chat-artifact-icon svg {
+  width: 14px;
+  height: 14px;
+  transform: translateY(-3px);
+}
+
+.team-card-content .chat-artifact-icon small {
+  bottom: 2px;
+  font-size: 8px;
+}
+
+.team-card-content .chat-artifact-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.team-card-content .chat-artifact-copy > strong,
+.team-card-content .chat-artifact-copy > small {
+  grid-column: 1;
+}
+
+.team-card-content .chat-artifact-copy > .artifact-actions {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  width: auto;
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+
 .team-card-preview {
   display: grid;
   margin: 0;
@@ -5053,8 +5099,9 @@ select:focus {
 /* A file the coworker created, shown inline in the message. Mirrors
    .conversation-file-card, built from inline elements so Markdown can nest it
    inside a paragraph. */
+/* Block-level so a file always starts on its own line, never beside the text. */
 .chat-artifact-card {
-  display: inline-grid;
+  display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   align-items: start;
   gap: 9px;
@@ -5067,7 +5114,6 @@ select:focus {
   border-radius: 10px;
   box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-color) 3%, transparent);
   text-align: left;
-  vertical-align: top;
 }
 
 .chat-artifact-icon {
