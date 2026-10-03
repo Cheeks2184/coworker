@@ -15,6 +15,7 @@ import type {
   WebSearchProvider,
 } from "@shared/contracts";
 import { webSearchProviders } from "@shared/contracts";
+import { formatClockDateTime, formatClockTime } from "@shared/time";
 import {
   getModelProviderDefinition,
   modelProviderBaseUrlKey,
@@ -1161,7 +1162,7 @@ export function SettingsPage({
                           <small>
                             {conversation.kind === "group" ? "Channel" : "Conversation"}
                             {members ? ` with ${members}` : ""} · archived{" "}
-                            {new Date(conversation.archivedAt!).toLocaleString()}
+                            {formatClockDateTime(conversation.archivedAt!)}
                           </small>
                         </div>
                         <div className="telegram-connection-actions">
@@ -1351,8 +1352,5 @@ function providerLabel(provider: WebSearchProvider): string {
 function formatDiagnosticTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(date);
+  return formatClockTime(date, { day: "numeric", month: "short", year: "numeric", second: "2-digit" });
 }

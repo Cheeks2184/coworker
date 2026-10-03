@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isoWithLocalOffset } from "@shared/time";
+import { formatClockDateTime, formatClockTime, isoWithLocalOffset } from "@shared/time";
 
 describe("schedule time context", () => {
   it("carries an offset that agrees with the wall clock it prints", () => {
@@ -19,5 +19,25 @@ describe("schedule time context", () => {
     expect(new Date(isoWithLocalOffset(inTenMinutes)).getTime()).toBeGreaterThan(
       new Date(isoWithLocalOffset(now)).getTime(),
     );
+  });
+});
+
+describe("clock time display", () => {
+  const afternoon = new Date(2026, 9, 3, 16, 13, 5);
+
+  it("uses a 12-hour clock with an uppercase AM/PM even where the locale prefers 24 hours", () => {
+    expect(afternoon.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })).toBe("16:13");
+    expect(formatClockTime(afternoon, {}, "en-GB")).toMatch(/^4:13\sPM$/);
+    expect(formatClockTime(new Date(2026, 9, 3, 9, 5), {}, "en-SG")).toMatch(/^9:05\sAM$/);
+  });
+
+  it("adds the date or seconds in the locale's own order", () => {
+    expect(formatClockDateTime(afternoon, "en-GB")).toMatch(/^3 Oct 2026, 4:13\sPM$/);
+    expect(formatClockDateTime(afternoon, "en-US")).toMatch(/^Oct 3, 2026, 4:13\sPM$/);
+    expect(formatClockTime(afternoon, { second: "2-digit" }, "en-GB")).toMatch(/^4:13:05\sPM$/);
+  });
+
+  it("leaves a value it cannot read unchanged", () => {
+    expect(formatClockDateTime("not a date")).toBe("not a date");
   });
 });

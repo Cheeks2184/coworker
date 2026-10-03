@@ -13,6 +13,7 @@ import type {
   WebSearchProvider,
 } from "@shared/contracts";
 import { describeCronExpression } from "@shared/schedule-frequency";
+import { formatClockDateTime } from "@shared/time";
 import { getToolCatalogEntry } from "@shared/tool-catalog";
 import type { CoworkerDatabase } from "@main/db/database";
 import {
@@ -333,7 +334,7 @@ function approvalSummary(toolName: string, args: unknown): string {
       const timing =
         parsed.data.scheduleType === "cron"
           ? `${describeCronExpression(parsed.data.cronExpression ?? null)} (${parsed.data.timezone})`
-          : new Date(parsed.data.runAt!).toLocaleString();
+          : formatClockDateTime(parsed.data.runAt!);
       return `Create schedule “${parsed.data.name}” · ${timing}`;
     }
   }

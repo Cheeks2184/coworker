@@ -50,6 +50,32 @@ export function shiftIsoTimestamp(value: string, shiftMs: number): string {
   );
 }
 
+/**
+ * A time on a 12-hour clock with an uppercase AM/PM, such as "4:13 PM", whatever
+ * clock the locale prefers. Extra fields add the date or seconds in the locale's
+ * own order, such as "3 Oct 2026, 4:13 PM".
+ */
+export function formatClockTime(
+  value: Date | string | number,
+  fields: Intl.DateTimeFormatOptions = {},
+  locale?: Intl.LocalesArgument,
+): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat(locale, { ...fields, hour: "numeric", minute: "2-digit", hour12: true })
+    .formatToParts(date)
+    .map((part) => (part.type === "dayPeriod" ? part.value.toUpperCase() : part.value))
+    .join("");
+}
+
+/** A date with a 12-hour clock time, such as "3 Oct 2026, 4:13 PM". */
+export function formatClockDateTime(
+  value: Date | string | number,
+  locale?: Intl.LocalesArgument,
+): string {
+  return formatClockTime(value, { day: "numeric", month: "short", year: "numeric" }, locale);
+}
+
 /** Applies {@link shiftIsoTimestamp} to every timestamp nested in a value. */
 export function shiftTimestampsDeep<T>(value: T, shiftMs: number): T {
   if (typeof value === "string") return shiftIsoTimestamp(value, shiftMs) as T;

@@ -82,8 +82,8 @@ describe("schedule frequency drafts", () => {
   });
 
   it("describes saved schedules without showing cron syntax", () => {
-    // The time half comes from the host locale, so match it case-insensitively.
-    expect(describeSchedule(schedule())).toMatch(/^Every weekday at 9:30\s?[AP]M$/i);
+    // Times always read on a 12-hour clock with an uppercase AM/PM.
+    expect(describeSchedule(schedule())).toMatch(/^Every weekday at 9:30\sAM$/);
     expect(describeSchedule(schedule({ cronExpression: "0 * * * *" }))).toBe(
       "Every hour, on the hour",
     );
@@ -95,7 +95,7 @@ describe("schedule frequency drafts", () => {
       "Every 6 hours",
     );
     expect(describeSchedule(schedule({ cronExpression: "0 9 3 * *" }))).toMatch(
-      /^Monthly on the 3rd at 9:00\s?[AP]M$/i,
+      /^Monthly on the 3rd at 9:00\sAM$/,
     );
     expect(describeSchedule(schedule({ cronExpression: "0 8 * * 1,3" }))).toBe(
       "0 8 * * 1,3",

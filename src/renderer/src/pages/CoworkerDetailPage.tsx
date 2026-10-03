@@ -63,6 +63,7 @@ import { QuickModelSwitcher } from "../components/QuickModelSwitcher";
 import { ScheduleEditorModal } from "../components/ScheduleEditorModal";
 import { Icon } from "../components/Icon";
 import { describeCronExpression, describeSchedule } from "@shared/schedule-frequency";
+import { formatClockDateTime, formatClockTime } from "@shared/time";
 import {
   findRecoveredToolCallIds,
   parseToolResultStatus,
@@ -2318,7 +2319,7 @@ function CoworkerSurface({
             ? describeCronExpression(parameters.cronExpression)
             : "Recurring schedule"
           : parameters.runAt
-            ? new Date(parameters.runAt).toLocaleString()
+            ? formatClockDateTime(parameters.runAt)
             : "One-time schedule";
       return (
         <div className="tool-card conversation-tool-card schedule-tool-card">
@@ -3946,9 +3947,7 @@ function formatMoney(value: number, currency: string): string {
 function formatRosterTime(value: string): string {
   const date = new Date(value);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
+  if (date.toDateString() === now.toDateString()) return formatClockTime(date);
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
@@ -3957,7 +3956,7 @@ function formatRosterTime(value: string): string {
 
 function formatMessageTime(value: string | undefined): string {
   if (!value) return "Now";
-  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatClockTime(value);
 }
 
 function formatActionType(actionType: string): string {
@@ -3985,7 +3984,7 @@ export function approvalPreviewRows(approval: Approval): Array<[string, string]>
     if (typeof record.cronExpression === "string") {
       rows.push(["Runs", describeCronExpression(record.cronExpression)]);
     } else if (typeof record.runAt === "string") {
-      rows.push(["Runs", `Once on ${new Date(record.runAt).toLocaleString()}`]);
+      rows.push(["Runs", `Once on ${formatClockDateTime(record.runAt)}`]);
     }
     const template = record.taskTemplate;
     if (template && typeof template === "object" && !Array.isArray(template)) {
