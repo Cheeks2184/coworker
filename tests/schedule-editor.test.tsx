@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleEditorModal } from "@renderer/components/ScheduleEditorModal";
-import { approvalPreviewRows } from "@renderer/pages/CoworkerDetailPage";
+import { approvalPreviewRows } from "@renderer/lib/approval-preview";
 import type { Coworker, Schedule } from "@shared/contracts";
 
 const coworker: Coworker = {

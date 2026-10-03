@@ -32,7 +32,9 @@ export type IconName =
   | "palette"
   | "copy"
   | "reply"
-  | "pin";
+  | "pin"
+  | "alert"
+  | "close";
 
 const paths: Record<IconName, React.ReactNode> = {
   palette: (
@@ -81,6 +83,13 @@ const paths: Record<IconName, React.ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="m9 18 6-6-6-6" />,
   back: <path d="m15 18-6-6 6-6" />,
+  alert: (
+    <>
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </>
+  ),
+  close: <path d="M18 6 6 18M6 6l12 12" />,
   send: <path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />,
   stop: <rect x="7" y="7" width="10" height="10" rx="1" />,
   open: (

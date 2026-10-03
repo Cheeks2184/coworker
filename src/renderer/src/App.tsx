@@ -123,10 +123,10 @@ export default function App() {
           onOpenCoworker={(coworker, conversationId) =>
             openCoworker(coworker.id, conversationId ?? null)
           }
+          onChatWithTeam={() => navigate("coworkers")}
           onOpenApprovals={() => navigate("approvals")}
           onManageCoworkers={openDirectory}
-          onOpenActivity={() => navigate("activity")}
-          onOpenActivityItem={openActivityTarget}
+          onOpenFiles={() => navigate("files")}
           onChanged={refresh}
         />
       ) : null}

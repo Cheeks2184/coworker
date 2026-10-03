@@ -385,11 +385,19 @@ describe("Coworkers navigation", () => {
     showReasoning: true, globalOperatingInstructions: "", defaultModelProvider: null, defaultModelName: null,
   };
 
-  function mockWorkroom(coworkers: Coworker[]) {
+  const finishedTask = (coworkerId: string): Task => ({
+    id: `task-${coworkerId}`, coworkerId, scheduleId: null, runId: `run-${coworkerId}`,
+    threadId: `coworker:${coworkerId}`, sourceMessageId: null, discussionId: null, discussionTurn: null,
+    title: "Draft the memo", input: "Draft the memo", status: "COMPLETED", source: "manual", priority: 0,
+    result: "Done.", error: null, createdAt: "2026-08-24T00:00:00.000Z", startedAt: "2026-08-24T00:00:00.000Z",
+    completedAt: "2026-08-24T00:05:00.000Z",
+  });
+
+  function mockWorkroom(coworkers: Coworker[], tasks: Task[] = []) {
     // History that never arrives keeps the chat on its loading state.
     const listConversation = vi.fn((_conversationId: string) => new Promise<never>(() => undefined));
     const snapshot: AppSnapshot = {
-      coworkers, conversations: [], discussions: [], tasks: [], messages: [],
+      coworkers, conversations: [], discussions: [], tasks, messages: [],
       imageAttachments: [], approvals: [], schedules: [], artifacts: [], activity: [],
       integrations: [], modelEndpoints: [], skills: [], settings,
       dataPath: "/tmp/coworker-data", version: "0.6.1",
@@ -410,14 +418,17 @@ describe("Coworkers navigation", () => {
     const { default: App } = await import("@renderer/App");
     const { AppDataProvider } = await import("@renderer/state/AppDataProvider");
     render(<AppDataProvider><App /></AppDataProvider>);
-    await screen.findByRole("heading", { name: "Your coworkers" });
+    await screen.findByRole("textbox", { name: "Describe the task" });
   }
 
   const mainNavigation = () => screen.queryByRole("navigation", { name: "Main navigation" });
 
   it("opens a chat from the sidebar: the primary at first, then whoever was opened last", async () => {
     window.localStorage.removeItem("last-opened-coworker");
-    const { listConversation } = mockWorkroom([coworker("ava", "Ava"), coworker("bea", "Bea", [], true)]);
+    const { listConversation } = mockWorkroom(
+      [coworker("ava", "Ava"), coworker("bea", "Bea", [], true)],
+      [finishedTask("ava")],
+    );
 
     await renderApp();
     fireEvent.click(within(mainNavigation()!).getByRole("button", { name: "Coworkers" }));
@@ -426,7 +437,7 @@ describe("Coworkers navigation", () => {
     cleanup();
 
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: /Ava specialist/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Open chat/ }));
     await vi.waitFor(() => expect(listConversation).toHaveBeenLastCalledWith("coworker:ava"));
     cleanup();
     listConversation.mockClear();
@@ -438,10 +449,21 @@ describe("Coworkers navigation", () => {
     window.localStorage.removeItem("last-opened-coworker");
   });
 
-  it("keeps the directory behind Manage all on Home", async () => {
+  it("opens the team chat from Home", async () => {
+    window.localStorage.removeItem("last-opened-coworker");
     const { listConversation } = mockWorkroom([coworker("ava", "Ava")]);
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: /Manage all/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Chat with team/ }));
+    await vi.waitFor(() => expect(listConversation).toHaveBeenCalledWith("coworker:ava"));
+    expect(mainNavigation()).toBeNull();
+  });
+
+  it("opens the directory from Home when the team is empty", async () => {
+    const { listConversation } = mockWorkroom([]);
+    const { default: App } = await import("@renderer/App");
+    const { AppDataProvider } = await import("@renderer/state/AppDataProvider");
+    render(<AppDataProvider><App /></AppDataProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: "Create coworker" }));
     expect(screen.getByRole("searchbox", { name: "Search coworkers" })).toBeTruthy();
     expect(mainNavigation()).toBeTruthy();
     expect(listConversation).not.toHaveBeenCalled();
