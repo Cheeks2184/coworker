@@ -56,7 +56,7 @@ See the [memory guide](memory.md) for examples, limits, and privacy details.
 - Invoice creation
 - Document export to PDF, Word DOCX, Excel XLSX, and CSV from semantic Markdown
 - Email drafts (`.eml` outbox by default) and approval-gated sending via Resend
-- Web search with Tavily, Exa, Firecrawl, and SerpAPI credential fallback
+- Web search with Tavily, Exa, Firecrawl, and SerpAPI credential fallback, working without a key on Firecrawl's free tier
 
 ## Skills
 

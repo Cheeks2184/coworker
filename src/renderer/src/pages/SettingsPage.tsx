@@ -93,7 +93,7 @@ export function SettingsPage({
   );
   const [makeDefaultModel, setMakeDefaultModel] = useState(true);
   const [defaultModelChoice, setDefaultModelChoice] = useState("");
-  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>("tavily");
+  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>("firecrawl");
   const [providerErrors, setProviderErrors] = useState<ProviderErrorDiagnostic[]>([]);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [globalInstructions, setGlobalInstructions] = useState(
@@ -1010,7 +1010,10 @@ export function SettingsPage({
             <section className="settings-section">
               <span className="eyebrow">Web search</span>
               <h2>Search providers</h2>
-              <p>The web-search skill automatically uses the first configured provider available.</p>
+              <p>
+                Web search works without a key on Firecrawl's free tier, which has a daily limit. Add
+                an API key for higher limits; the first configured provider is used.
+              </p>
               <div className="provider-grid model-provider-grid">
                 {webSearchProviders.map((provider) => (
                   <button

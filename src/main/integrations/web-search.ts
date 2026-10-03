@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { WebSearchProvider } from "@shared/contracts";
+import { webSearchProviders, type WebSearchProvider } from "@shared/contracts";
 import type { CredentialStore } from "@main/security/credential-store";
 
 export interface WebSearchResult {
@@ -11,8 +11,6 @@ export interface WebSearchResult {
 export function webSearchCredentialKey(provider: WebSearchProvider): string {
   return `web-search:${provider}`;
 }
-
-const providerOrder: readonly WebSearchProvider[] = ["tavily", "exa", "firecrawl", "serpapi"];
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 4_000) : "";
@@ -76,16 +74,7 @@ async function searchProvider(
     const body = (await jsonResponse(response, provider)) as { results?: unknown };
     return normalizeResults(body.results);
   }
-  if (provider === "firecrawl") {
-    const response = await fetcher("https://api.firecrawl.dev/v1/search", {
-      method: "POST",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ query, limit }),
-      signal,
-    });
-    const body = (await jsonResponse(response, provider)) as { data?: unknown };
-    return normalizeResults(body.data);
-  }
+  if (provider === "firecrawl") return searchFirecrawl(apiKey, query, limit, fetcher);
   const url = new URL("https://serpapi.com/search.json");
   url.searchParams.set("q", query);
   url.searchParams.set("api_key", apiKey);
@@ -93,6 +82,31 @@ async function searchProvider(
   const response = await fetcher(url, { signal });
   const body = (await jsonResponse(response, provider)) as { organic_results?: unknown };
   return normalizeResults(body.organic_results);
+}
+
+/** Without a key, Firecrawl serves a free tier capped per IP address per day. */
+async function searchFirecrawl(
+  apiKey: string | null,
+  query: string,
+  limit: number,
+  fetcher: typeof fetch,
+): Promise<WebSearchResult[]> {
+  const response = await fetcher("https://api.firecrawl.dev/v2/search", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({ query, limit }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!apiKey && response.status === 429) {
+    throw new Error(
+      "Firecrawl's free search limit for today is used up. Add a free Firecrawl API key, or a Tavily, Exa, or SerpAPI key, in Settings → Web search to keep searching.",
+    );
+  }
+  const body = (await jsonResponse(response, "firecrawl")) as { data?: { web?: unknown } };
+  return normalizeResults(body.data?.web);
 }
 
 export async function searchWeb(input: {
@@ -105,8 +119,8 @@ export async function searchWeb(input: {
   const query = z.string().trim().min(1).max(2_000).parse(input.query);
   const limit = z.number().int().min(1).max(10).default(5).parse(input.limit);
   const order = input.preferredProvider
-    ? [input.preferredProvider, ...providerOrder.filter((item) => item !== input.preferredProvider)]
-    : [...providerOrder];
+    ? [input.preferredProvider, ...webSearchProviders.filter((item) => item !== input.preferredProvider)]
+    : [...webSearchProviders];
   const failures: string[] = [];
   for (const provider of order) {
     const apiKey = await input.credentials.get(webSearchCredentialKey(provider));
@@ -119,5 +133,7 @@ export async function searchWeb(input: {
     }
   }
   if (failures.length > 0) throw new Error(`All configured search providers failed. ${failures.join("; ")}`);
-  throw new Error("Configure a Tavily, Exa, Firecrawl, or SerpAPI key in Settings first");
+  // Reaching here means no key is configured; Firecrawl's free tier needs none.
+  const results = await searchFirecrawl(null, query, limit, input.fetcher ?? fetch);
+  return { provider: "firecrawl", query, results };
 }

@@ -114,7 +114,8 @@ export interface Skill {
   updatedAt: string;
 }
 
-export const webSearchProviders = ["tavily", "exa", "firecrawl", "serpapi"] as const;
+/** Listed and tried in this order; Firecrawl leads because it also works without a key. */
+export const webSearchProviders = ["firecrawl", "tavily", "exa", "serpapi"] as const;
 export type WebSearchProvider = (typeof webSearchProviders)[number];
 
 export interface SharedFolder {

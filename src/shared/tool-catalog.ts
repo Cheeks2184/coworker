@@ -50,7 +50,7 @@ export const toolCatalog = [
     name: "web.search",
     label: "Search the web",
     description:
-      "Search the live web through an available configured Firecrawl, Tavily, Exa, or SerpAPI credential.",
+      "Search the live web with a configured Firecrawl, Tavily, Exa, or SerpAPI key, or Firecrawl's free tier when no key is set.",
     risk: "low",
     defaultPolicy: "automatic",
   },
