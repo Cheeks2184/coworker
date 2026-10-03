@@ -365,8 +365,10 @@ export const addModelEndpointSchema = z.object({
   defaultModelName: z.string().trim().min(1).max(160).optional(),
 });
 
+export const webSearchProviderSchema = z.enum(webSearchProviders);
+
 export const configureWebSearchSchema = z.object({
-  provider: z.enum(webSearchProviders),
+  provider: webSearchProviderSchema,
   apiKey: z.string().trim().min(1).max(2_000),
 });
 

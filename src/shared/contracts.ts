@@ -709,10 +709,13 @@ export interface DesktopApi {
     ): Promise<{ supportsImages: boolean }>;
     credentialStatus(key: string): Promise<CredentialStatus>;
     removeCredential(key: string): Promise<void>;
+    /** Forgets a built-in provider's key and base URL and restarts the coworkers using it. */
+    disconnectModel(provider: RemoteModelProvider): Promise<void>;
     configureWebSearch(input: {
       provider: WebSearchProvider;
       apiKey: string;
     }): Promise<CredentialStatus>;
+    disconnectWebSearch(provider: WebSearchProvider): Promise<void>;
   };
   skills: {
     list(): Promise<Skill[]>;

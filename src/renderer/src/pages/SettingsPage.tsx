@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type {
   AppSettings,
   ConfigureModelResult,
@@ -24,6 +24,7 @@ import {
   remoteModelProviderDefinitions,
 } from "@shared/model-providers";
 import { AppearanceControls } from "../components/AppearanceControls";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { ModelSelector } from "../components/ModelSelector";
 import { PageHeader } from "../components/Primitives";
@@ -48,6 +49,15 @@ const settingsTabLabels: Record<SettingsTab, string> = {
   archived: "Archived",
   data: "Data",
 };
+
+interface Confirmation {
+  eyebrow: string;
+  title: string;
+  body: ReactNode;
+  confirmLabel: string;
+  busyLabel: string;
+  onConfirm: () => Promise<void>;
+}
 
 function bytesToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -94,6 +104,7 @@ export function SettingsPage({
   const [makeDefaultModel, setMakeDefaultModel] = useState(true);
   const [defaultModelChoice, setDefaultModelChoice] = useState("");
   const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>("firecrawl");
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [providerErrors, setProviderErrors] = useState<ProviderErrorDiagnostic[]>([]);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [globalInstructions, setGlobalInstructions] = useState(
@@ -174,6 +185,18 @@ export function SettingsPage({
   useEffect(() => {
     setGlobalInstructions(settings.globalOperatingInstructions);
   }, [settings.globalOperatingInstructions]);
+
+  // Errors stay until the next action so they can be read; confirmations fade on their own.
+  useEffect(() => {
+    if (!notice || noticeKind !== "success") return;
+    const timer = setTimeout(() => setNotice(null), 5_000);
+    return () => clearTimeout(timer);
+  }, [notice, noticeKind]);
+
+  function openTab(next: SettingsTab) {
+    setTab(next);
+    setNotice(null);
+  }
 
   useEffect(() => {
     if (tab === "data") void refreshProviderErrors();
@@ -343,22 +366,65 @@ export function SettingsPage({
     }
   }
 
-  async function removeEndpoint(endpoint: ModelEndpoint) {
-    if (!confirm(`Remove the endpoint “${endpoint.name}”?`)) return;
-    setWorking(true);
-    setNotice(null);
-    try {
-      await window.coworker.integrations.removeModelEndpoint(endpoint.id);
-      setModelProvider("openrouter");
-      await onChanged();
-      setNoticeKind("success");
-      setNotice(`${endpoint.name} was removed.`);
-    } catch (removeError) {
-      setNoticeKind("error");
-      setNotice(removeError instanceof Error ? removeError.message : String(removeError));
-    } finally {
-      setWorking(false);
-    }
+  function confirmRemoveEndpoint(endpoint: ModelEndpoint) {
+    setConfirmation({
+      eyebrow: "Model Providers",
+      title: `Remove “${endpoint.name}”?`,
+      body: <p>Its address and any saved key are removed from this computer.</p>,
+      confirmLabel: "Remove endpoint",
+      busyLabel: "Removing…",
+      onConfirm: async () => {
+        await window.coworker.integrations.removeModelEndpoint(endpoint.id);
+        setModelProvider("openrouter");
+        await onChanged();
+        setConfirmation(null);
+        setNoticeKind("success");
+        setNotice(`${endpoint.name} was removed.`);
+      },
+    });
+  }
+
+  function confirmDisconnectModel(provider: RemoteModelProvider) {
+    const label = modelProviderDisplayName(provider, modelEndpoints);
+    const dependents = coworkers
+      .filter((coworker) => coworker.modelProvider === provider)
+      .map((coworker) => coworker.name);
+    setConfirmation({
+      eyebrow: "Model Providers",
+      title: `Disconnect ${label}?`,
+      body: (
+        <ul className="confirm-list">
+          <li>
+            {getModelProviderDefinition(provider).apiKeyRequired
+              ? "Its saved API key is removed from this computer."
+              : "Its saved connection is removed from this computer."}
+          </li>
+          {dependents.length > 0 ? (
+            <li>
+              {new Intl.ListFormat(undefined, { type: "conjunction" }).format(dependents)} will
+              stop working until you reconnect {label} or give them another model.
+            </li>
+          ) : null}
+          {settings.defaultModelProvider === provider ? (
+            <li>{label} will no longer be the global default model.</li>
+          ) : null}
+        </ul>
+      ),
+      confirmLabel: "Disconnect",
+      busyLabel: "Disconnecting…",
+      onConfirm: async () => {
+        await window.coworker.integrations.disconnectModel(provider);
+        setCredentialStatus((current) => ({
+          ...current,
+          [modelProviderCredentialKey(provider)]: false,
+          [modelProviderBaseUrlKey(provider)]: false,
+        }));
+        await onChanged();
+        setConfirmation(null);
+        setNoticeKind("success");
+        setNotice(`${label} was disconnected.`);
+      },
+    });
   }
 
   async function configureEmail(event: FormEvent<HTMLFormElement>) {
@@ -431,6 +497,37 @@ export function SettingsPage({
     } finally {
       setWorking(false);
     }
+  }
+
+  function confirmRemoveSearchKey(provider: WebSearchProvider) {
+    const label = providerLabel(provider);
+    const otherKeys = webSearchProviders.filter(
+      (other) => other !== provider && credentialStatus[`web-search:${other}`],
+    ).length;
+    setConfirmation({
+      eyebrow: "Web search",
+      title: `Remove the ${label} key?`,
+      body: (
+        <p>
+          {otherKeys > 0
+            ? `Web search keeps working with your other saved ${otherKeys === 1 ? "key" : "keys"}.`
+            : "Web search will use Firecrawl's free tier, which has a daily limit."}
+        </p>
+      ),
+      confirmLabel: "Remove key",
+      busyLabel: "Removing…",
+      onConfirm: async () => {
+        await window.coworker.integrations.disconnectWebSearch(provider);
+        setCredentialStatus((current) => ({ ...current, [`web-search:${provider}`]: false }));
+        setConfirmation(null);
+        setNoticeKind("success");
+        setNotice(
+          otherKeys > 0
+            ? `${label} key removed.`
+            : `${label} key removed. Web search now uses Firecrawl's free tier.`,
+        );
+      },
+    });
   }
 
   async function discardUnreadableCredentials() {
@@ -525,20 +622,21 @@ export function SettingsPage({
     }
   }
 
-  async function removeSkill(skill: Skill) {
-    if (!confirm(`Remove the global skill “${skill.name}”?`)) return;
-    setWorking(true);
-    try {
-      await window.coworker.skills.remove(skill.id);
-      await onChanged();
-      setNoticeKind("success");
-      setNotice(`${skill.name} was removed.`);
-    } catch (removeError) {
-      setNoticeKind("error");
-      setNotice(removeError instanceof Error ? removeError.message : String(removeError));
-    } finally {
-      setWorking(false);
-    }
+  function confirmRemoveSkill(skill: Skill) {
+    setConfirmation({
+      eyebrow: "Skills",
+      title: `Remove the “${skill.name}” skill?`,
+      body: <p>It is removed for every coworker that uses it.</p>,
+      confirmLabel: "Remove skill",
+      busyLabel: "Removing…",
+      onConfirm: async () => {
+        await window.coworker.skills.remove(skill.id);
+        await onChanged();
+        setConfirmation(null);
+        setNoticeKind("success");
+        setNotice(`${skill.name} was removed.`);
+      },
+    });
   }
 
   async function restoreArchivedConversation(conversation: Conversation) {
@@ -589,7 +687,7 @@ export function SettingsPage({
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
           {(Object.keys(settingsTabLabels) as SettingsTab[]).map((item) => (
-            <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>
+            <button className={tab === item ? "active" : ""} key={item} onClick={() => openTab(item)}>
               {settingsTabLabels[item]}
             </button>
           ))}
@@ -611,7 +709,7 @@ export function SettingsPage({
                       <strong>{location.label}</strong>
                       <button
                         className="text-button"
-                        onClick={() => setTab(location.tab)}
+                        onClick={() => openTab(location.tab)}
                         type="button"
                       >
                         Open {settingsTabLabels[location.tab]}
@@ -829,11 +927,21 @@ export function SettingsPage({
                       : modelProviderDisplayName(modelProvider, modelEndpoints)}
                   </strong>
                   <small>
-                    {addingEndpoint
-                      ? "Name the endpoint so you can tell your local servers apart"
-                      : activeConnected
-                        ? "Connected · enter new credentials to replace the saved configuration"
-                        : "Enter the provider credentials below"}
+                    {addingEndpoint ? (
+                      "Name the endpoint so you can tell your local servers apart"
+                    ) : activeConnected ? (
+                      <>
+                        <span className="credential-saved">
+                          <Icon name="check" />
+                          {activeDefinition.apiKeyRequired ? "API key saved" : "Connected"}
+                        </span>
+                        {activeDefinition.apiKeyRequired
+                          ? " · enter a new key to replace it"
+                          : " · enter new settings to replace the saved ones"}
+                      </>
+                    ) : (
+                      "Enter the provider credentials below"
+                    )}
                   </small>
                 </div>
                 {isEndpointForm ? (
@@ -915,10 +1023,19 @@ export function SettingsPage({
                     <button
                       className="ghost-button danger"
                       disabled={working}
-                      onClick={() => void removeEndpoint(selectedEndpoint)}
+                      onClick={() => confirmRemoveEndpoint(selectedEndpoint)}
                       type="button"
                     >
                       Remove endpoint
+                    </button>
+                  ) : activeProvider && activeConnected ? (
+                    <button
+                      className="ghost-button danger"
+                      disabled={working}
+                      onClick={() => confirmDisconnectModel(activeProvider)}
+                      type="button"
+                    >
+                      Disconnect
                     </button>
                   ) : null}
                 </div>
@@ -975,7 +1092,7 @@ export function SettingsPage({
                         <button
                           className="ghost-button danger"
                           disabled={working}
-                          onClick={() => void removeSkill(skill)}
+                          onClick={() => confirmRemoveSkill(skill)}
                           type="button"
                         >
                           Remove
@@ -1051,9 +1168,17 @@ export function SettingsPage({
                 <div className="credential-form-heading">
                   <strong>{providerLabel(webSearchProvider)}</strong>
                   <small>
-                    {credentialStatus[`web-search:${webSearchProvider}`]
-                      ? "Connected · enter a new key to replace the saved one"
-                      : "Enter the provider API key below"}
+                    {credentialStatus[`web-search:${webSearchProvider}`] ? (
+                      <>
+                        <span className="credential-saved">
+                          <Icon name="check" />
+                          API key saved
+                        </span>
+                        {" · enter a new key to replace it"}
+                      </>
+                    ) : (
+                      "Enter the provider API key below"
+                    )}
                   </small>
                 </div>
                 <input
@@ -1067,7 +1192,19 @@ export function SettingsPage({
                   required
                   type="password"
                 />
-                <button className="primary-button" disabled={working}>Save search key</button>
+                <div className="credential-form-actions">
+                  <button className="primary-button" disabled={working}>Save search key</button>
+                  {credentialStatus[`web-search:${webSearchProvider}`] ? (
+                    <button
+                      className="ghost-button danger"
+                      disabled={working}
+                      onClick={() => confirmRemoveSearchKey(webSearchProvider)}
+                      type="button"
+                    >
+                      Remove key
+                    </button>
+                  ) : null}
+                </div>
               </form>
             </section>
           ) : null}
@@ -1315,6 +1452,18 @@ export function SettingsPage({
           ) : null}
         </div>
       </div>
+      {confirmation ? (
+        <ConfirmDialog
+          busyLabel={confirmation.busyLabel}
+          confirmLabel={confirmation.confirmLabel}
+          eyebrow={confirmation.eyebrow}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={confirmation.onConfirm}
+          title={confirmation.title}
+        >
+          {confirmation.body}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

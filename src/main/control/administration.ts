@@ -91,6 +91,10 @@ export function createAdministration(input: {
     input.service.addModelEndpoint(addModelEndpointSchema.parse(value))],
     [ipcChannels.integrationsRemoveModelEndpoint, (id) =>
     input.service.removeModelEndpoint(remoteModelProviderSchema.parse(id))],
+    [ipcChannels.integrationsDisconnectModel, (provider) =>
+    input.service.disconnectModelProvider(remoteModelProviderSchema.parse(provider))],
+    [ipcChannels.integrationsDisconnectWebSearch, (provider) =>
+    input.service.disconnectWebSearch(validation.webSearchProviderSchema.parse(provider))],
     [ipcChannels.integrationsListModels, (provider) =>
     input.service.listModels(modelProviderSchema.parse(provider))],
     [ipcChannels.integrationsCredentialStatus, async (key) => {

@@ -274,4 +274,41 @@ describe("OpenRouter credentials", () => {
       database.close();
     }
   });
+
+  it("disconnects OpenRouter: forgets its key, restarts its coworkers and clears the default", async () => {
+    const root = await temporaryDirectory();
+    const database = new CoworkerDatabase(join(root, "coworker.db"));
+    const credentials = memoryCredentials();
+    credentials.values.set("model:openrouter", "sk-or-v1-saved");
+    const service = new DesktopAppService({ dataPath: root, database, credentials });
+    const routed = database.createCoworker(
+      {
+        name: "Ava",
+        role: "Analyst",
+        systemPrompt: "Help.",
+        modelProvider: "openrouter",
+        modelName: routerModel.id,
+        enabledTools: [],
+      },
+      join(root, "workspaces", "ava"),
+    );
+    database.updateSettings({ defaultModelProvider: "openrouter", defaultModelName: routerModel.id });
+    const stop = vi.spyOn(service.runtime, "stop").mockResolvedValue();
+    vi.spyOn(service.runtime, "enqueueTask").mockImplementation(() => undefined);
+    try {
+      await service.disconnectModelProvider("openrouter");
+      expect(credentials.values.has("model:openrouter")).toBe(false);
+      expect(stop.mock.calls).toEqual([[routed.id]]);
+      // The coworker keeps its model so reconnecting brings it straight back.
+      expect(database.getCoworker(routed.id).modelProvider).toBe("openrouter");
+      expect(database.getSettings()).toMatchObject({ defaultModelProvider: null, defaultModelName: null });
+      expect(database.listActivity().map((item) => item.type)).toContain("model.disconnected");
+
+      await expect(service.disconnectModelProvider("openai-compatible:desk")).rejects.toThrow(
+        "Remove OpenAI-compatible endpoints instead of disconnecting them",
+      );
+    } finally {
+      database.close();
+    }
+  });
 });

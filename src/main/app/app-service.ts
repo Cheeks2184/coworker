@@ -1954,6 +1954,26 @@ export class DesktopAppService {
     this.emit({ type: "entity.changed", entity: "integrations" });
   }
 
+  /** Coworkers on the provider keep their model and fail with a reconnect hint until it is set up again. */
+  async disconnectModelProvider(provider: RemoteModelProvider): Promise<void> {
+    if (isModelEndpointProvider(provider)) {
+      throw new Error("Remove OpenAI-compatible endpoints instead of disconnecting them");
+    }
+    await this.options.credentials.delete(modelProviderCredentialKey(provider));
+    await this.options.credentials.delete(modelProviderBaseUrlKey(provider));
+    await this.restartCoworkersUsing(provider);
+    if (this.database.getSettings().defaultModelProvider === provider) {
+      await this.updateSettings({ defaultModelProvider: null, defaultModelName: null });
+    }
+    this.database.addActivity({
+      type: "model.disconnected",
+      summary: `${modelProviderName(provider)} was disconnected`,
+      metadata: { provider },
+    });
+    this.emit({ type: "entity.changed", entity: "integrations" });
+    this.emit({ type: "entity.changed", entity: "activity" });
+  }
+
   async configureWebSearch(input: {
     provider: WebSearchProvider;
     apiKey: string;
@@ -1968,6 +1988,17 @@ export class DesktopAppService {
     this.emit({ type: "entity.changed", entity: "integrations" });
     this.emit({ type: "entity.changed", entity: "activity" });
     return { key, configured: true };
+  }
+
+  async disconnectWebSearch(provider: WebSearchProvider): Promise<void> {
+    await this.options.credentials.delete(webSearchCredentialKey(provider));
+    this.database.addActivity({
+      type: "web-search.disconnected",
+      summary: `${provider} web search was disconnected`,
+      metadata: { provider },
+    });
+    this.emit({ type: "entity.changed", entity: "integrations" });
+    this.emit({ type: "entity.changed", entity: "activity" });
   }
 
   async installSkillFromUrl(url: string, coworkerId?: string) {
