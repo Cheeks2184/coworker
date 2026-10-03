@@ -1,5 +1,5 @@
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
-import { Type, type Context } from "@earendil-works/pi-ai";
+import { Type, normalizeContext, type Context } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import {
   clearEchoedReasoningField,
@@ -30,14 +30,12 @@ describe("OpenRouter reasoning compatibility", () => {
     expect(withOpenRouterReasoningCompat(compatible)).toBe(compatible);
   });
 
-  it("fixes the catalog model that rejected requests with mandatory reasoning", () => {
+  it("keeps the catalog model with mandatory reasoning from receiving effort none", () => {
     const model = openrouterProvider()
       .getModels()
       .find((candidate) => candidate.id === "google/gemini-3.7-flash");
     expect(model).toBeDefined();
     expect(model?.reasoning).toBe(true);
-    // Without the compat fix Pi would send `reasoning: { effort: "none" }`.
-    expect(model?.thinkingLevelMap?.off).not.toBeNull();
     expect(withOpenRouterReasoningCompat(model!).thinkingLevelMap?.off).toBeNull();
   });
 
@@ -76,16 +74,44 @@ describe("OpenRouter reasoning compatibility", () => {
       messages: [{ role: "user", content: "Remember this example", timestamp: Date.now() }],
       tools: [{ name: "propose", description: "Propose an edit", parameters: Type.Object({ text: Type.String() }) }],
     };
-    const first = await provider.streamSimple(model, context, { apiKey: "test-key", fetch }).result();
+    const first = await provider.streamSimple(model, normalizeContext(context), { apiKey: "test-key", fetch }).result();
     expect(first.stopReason).toBe("toolUse");
     context.messages.push(JSON.parse(JSON.stringify(first)), {
       role: "toolResult", toolCallId: "call-1", toolName: "propose", content: [{ type: "text", text: "Approval required. Task paused." }], isError: false, timestamp: Date.now(),
     }, { role: "user", content: "The human rejected the proposal. Continue.", timestamp: Date.now() });
-    const resumed = await provider.streamSimple(model, context, { apiKey: "test-key", fetch }).result();
+    const resumed = await provider.streamSimple(model, normalizeContext(context), { apiKey: "test-key", fetch }).result();
     expect(resumed.stopReason).toBe("stop");
     expect(requests).toHaveLength(2);
     for (const request of requests) expect(request.provider).toEqual({ only: ["google-vertex"], allow_fallbacks: false });
     expect(requests[1].messages.find((m: any) => m.role === "assistant").reasoning_details).toEqual([signature]);
+  });
+
+  it("shows reasoning streamed only as reasoning_details and replays the details, not the text", async () => {
+    const provider = openrouterProvider();
+    const model = withOpenRouterReasoningCompat(provider.getModels().find(m => m.id === "google/gemini-3.7-flash")!);
+    const detail = (text: string) => ({ type: "reasoning.text", text, format: "google-gemini-v1", index: 0 });
+    const requests: any[] = [];
+    const fetch: typeof globalThis.fetch = async (_url, options) => {
+      requests.push(JSON.parse(String(options?.body)));
+      const chunks = requests.length === 1
+        ? [
+          { choices: [{ index: 0, delta: { reasoning_details: [detail("Check the ")] }, finish_reason: null }] },
+          { choices: [{ index: 0, delta: { reasoning_details: [detail("calendar.")] }, finish_reason: null }] },
+          { choices: [{ index: 0, delta: { content: "Done." }, finish_reason: "stop" }] },
+        ]
+        : [{ choices: [{ index: 0, delta: { content: "Again." }, finish_reason: "stop" }] }];
+      return new Response(chunks.map(c => `data: ${JSON.stringify(c)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
+    };
+    const context: Context = { messages: [{ role: "user", content: "Plan my day", timestamp: Date.now() }] };
+
+    const first = await provider.streamSimple(model, normalizeContext(context), { apiKey: "test-key", fetch }).result();
+    expect(first.content.find(block => block.type === "thinking")).toMatchObject({ thinking: "Check the calendar." });
+
+    context.messages.push(JSON.parse(JSON.stringify(first)), { role: "user", content: "Once more", timestamp: Date.now() });
+    await provider.streamSimple(model, normalizeContext(context), { apiKey: "test-key", fetch }).result();
+    const replayed = requests[1].messages.find((m: any) => m.role === "assistant");
+    expect(replayed.reasoning_details).toEqual([detail("Check the calendar.")]);
+    expect(replayed).not.toHaveProperty("reasoning");
   });
 });
 

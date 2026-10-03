@@ -114,7 +114,8 @@ export interface Skill {
   updatedAt: string;
 }
 
-export const webSearchProviders = ["tavily", "exa", "firecrawl", "serpapi"] as const;
+/** Listed and tried in this order; Firecrawl leads because it also works without a key. */
+export const webSearchProviders = ["firecrawl", "tavily", "exa", "serpapi"] as const;
 export type WebSearchProvider = (typeof webSearchProviders)[number];
 
 export interface SharedFolder {
@@ -131,6 +132,12 @@ export interface Coworker {
   description: string | null;
   /** User-chosen avatar from the bundled set; null falls back to an id hash. */
   avatarIndex?: number | null;
+  /** Uploaded photo as an image data URL; null/undefined falls back to the bundled avatar. */
+  avatarImage?: string | null;
+  /** The orchestrator coworker; at most one coworker is primary. */
+  isPrimary: boolean;
+  /** Lowercase labels used to search and group coworkers. */
+  tags: string[];
   systemPrompt: string;
   modelProvider: ModelProvider;
   modelName: string;
@@ -150,6 +157,8 @@ export interface CreateCoworkerInput {
   role: string;
   description?: string;
   avatarIndex?: number;
+  avatarImage?: string;
+  tags?: string[];
   systemPrompt: string;
   modelProvider: ModelProvider;
   modelName: string;
@@ -164,6 +173,10 @@ export interface UpdateCoworkerInput {
   role?: string;
   description?: string | null;
   avatarIndex?: number;
+  /** Data URL to set a photo, null to remove it. */
+  avatarImage?: string | null;
+  tags?: string[];
+  isPrimary?: boolean;
   systemPrompt?: string;
   modelProvider?: ModelProvider;
   modelName?: string;
@@ -193,6 +206,10 @@ export interface Task {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  /** Set (in app snapshots) when this task reports back another coworker's work. */
+  replyFromCoworkerId?: string | null;
+  /** Set (in app snapshots) when this task is delegated work; the thread that asked for it. */
+  delegatedFromThreadId?: string | null;
 }
 
 export interface Conversation {
@@ -205,6 +222,23 @@ export interface Conversation {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Links a task to the coworker-to-coworker request that created it. */
+export interface PeerTask {
+  taskId: string;
+  kind: "request" | "reply";
+  /** Null when the human sent the message through an @mention. */
+  fromCoworkerId: string | null;
+  toCoworkerId: string;
+  originThreadId: string;
+  replyToCoworkerId: string | null;
+  /** The sender's task that issued the request; a follow-up continues it. */
+  originTaskId: string | null;
+  /** 0 = started by the user; a request is one deeper than its sender. */
+  depth: number;
+  createdAt: string;
+  deliveredAt: string | null;
 }
 
 export interface CreateConversationInput {
@@ -675,10 +709,13 @@ export interface DesktopApi {
     ): Promise<{ supportsImages: boolean }>;
     credentialStatus(key: string): Promise<CredentialStatus>;
     removeCredential(key: string): Promise<void>;
+    /** Forgets a built-in provider's key and base URL and restarts the coworkers using it. */
+    disconnectModel(provider: RemoteModelProvider): Promise<void>;
     configureWebSearch(input: {
       provider: WebSearchProvider;
       apiKey: string;
     }): Promise<CredentialStatus>;
+    disconnectWebSearch(provider: WebSearchProvider): Promise<void>;
   };
   skills: {
     list(): Promise<Skill[]>;

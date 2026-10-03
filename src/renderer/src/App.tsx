@@ -3,6 +3,7 @@ import type { ActivityItem } from "@shared/contracts";
 import { AppShell } from "./components/AppShell";
 import { Icon } from "./components/Icon";
 import { useAppearance } from "./lib/appearance";
+import { defaultCoworkerId, rememberOpenedCoworker } from "./lib/pinned-coworkers";
 import type { PageId } from "./navigation";
 import { ActivityPage } from "./pages/ActivityPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
@@ -64,9 +65,17 @@ export default function App() {
 
   function navigate(nextPage: PageId) {
     setPage(nextPage);
-    setSelectedCoworkerId(null);
+    setSelectedCoworkerId(
+      nextPage === "coworkers" && snapshot ? defaultCoworkerId(snapshot.coworkers) : null,
+    );
     setFocusConversationId(null);
     setSettingsTab("general");
+  }
+
+  function openDirectory() {
+    setPage("coworkers");
+    setSelectedCoworkerId(null);
+    setFocusConversationId(null);
   }
 
   function openModelSettings() {
@@ -76,6 +85,7 @@ export default function App() {
   }
 
   function openCoworker(coworkerId: string, conversationId: string | null = null) {
+    rememberOpenedCoworker(coworkerId);
     setPage("coworkers");
     setSelectedCoworkerId(coworkerId);
     setFocusConversationId(conversationId);
@@ -113,10 +123,10 @@ export default function App() {
           onOpenCoworker={(coworker, conversationId) =>
             openCoworker(coworker.id, conversationId ?? null)
           }
+          onChatWithTeam={() => navigate("coworkers")}
           onOpenApprovals={() => navigate("approvals")}
-          onManageCoworkers={() => navigate("coworkers")}
-          onOpenActivity={() => navigate("activity")}
-          onOpenActivityItem={openActivityTarget}
+          onManageCoworkers={openDirectory}
+          onOpenFiles={() => navigate("files")}
           onChanged={refresh}
         />
       ) : null}
@@ -154,6 +164,7 @@ export default function App() {
           modelEndpoints={snapshot.modelEndpoints}
           initialConversationId={focusConversationId}
           onBack={() => navigate("home")}
+          onOpenSettings={() => navigate("settings")}
           onChanged={refresh}
           onOpenApprovals={() => navigate("approvals")}
           onOpenModelSettings={openModelSettings}

@@ -105,8 +105,12 @@ const api: DesktopApi = {
       ipcRenderer.invoke(ipcChannels.integrationsCredentialStatus, key),
     removeCredential: (key) =>
       ipcRenderer.invoke(ipcChannels.integrationsRemoveCredential, key),
+    disconnectModel: (provider) =>
+      ipcRenderer.invoke(ipcChannels.integrationsDisconnectModel, provider),
     configureWebSearch: (input) =>
       ipcRenderer.invoke(ipcChannels.integrationsConfigureWebSearch, input),
+    disconnectWebSearch: (provider) =>
+      ipcRenderer.invoke(ipcChannels.integrationsDisconnectWebSearch, provider),
     configureTelegram: (input) =>
       ipcRenderer.invoke(ipcChannels.integrationsConfigureTelegram, input),
     telegramStatus: () => ipcRenderer.invoke(ipcChannels.integrationsTelegramStatus),

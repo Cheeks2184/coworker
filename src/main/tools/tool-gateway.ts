@@ -13,6 +13,7 @@ import type {
   WebSearchProvider,
 } from "@shared/contracts";
 import { describeCronExpression } from "@shared/schedule-frequency";
+import { formatClockDateTime } from "@shared/time";
 import { getToolCatalogEntry } from "@shared/tool-catalog";
 import type { CoworkerDatabase } from "@main/db/database";
 import {
@@ -32,6 +33,7 @@ import { editWorkspaceText, prepareWorkspaceTextMutation, readWorkspaceText, res
 import { validateWorkspaceTextApprovalEdit, workspaceTextApproval } from "@shared/workspace-text-approval";
 import { searchWeb } from "@main/integrations/web-search";
 import { skillEnablesTool } from "@shared/skill-capabilities";
+import type { PeerMessaging } from "@main/app/peer-messaging";
 import {
   BrowserAutomationService,
   isBrowserRichToolResult,
@@ -98,6 +100,16 @@ const browserActionSchema = z.discriminatedUnion("kind", [
 ]);
 
 const schemas = {
+  "coworkers.list": z.object({}),
+  "coworkers.send_message": z.object({
+    coworker: z.string().trim().min(1).max(128),
+    message: z.string().trim().min(1).max(8_000),
+    expectReply: z.boolean().default(true),
+  }),
+  "coworkers.activity": z.object({
+    coworker: z.string().trim().min(1).max(128).optional(),
+    sinceHours: z.number().int().min(1).max(168).default(24),
+  }),
   "skills.read": z.object({
     name: z.string().trim().min(1).max(64),
     path: z.string().trim().min(1).max(500).optional(),
@@ -254,6 +266,7 @@ export type ToolGatewayResult =
 export interface ToolGatewayActions {
   createSchedule?: (input: CreateScheduleInput) => Schedule;
   browser?: BrowserAutomationService;
+  peers?: PeerMessaging;
 }
 
 function normalizeEmailPayload(input: z.infer<(typeof schemas)["email.send"]>): EmailPayload {
@@ -321,7 +334,7 @@ function approvalSummary(toolName: string, args: unknown): string {
       const timing =
         parsed.data.scheduleType === "cron"
           ? `${describeCronExpression(parsed.data.cronExpression ?? null)} (${parsed.data.timezone})`
-          : new Date(parsed.data.runAt!).toLocaleString();
+          : formatClockDateTime(parsed.data.runAt!);
       return `Create schedule “${parsed.data.name}” · ${timing}`;
     }
   }
@@ -644,6 +657,46 @@ export class ToolGateway {
           sourceUrl: skill.sourceUrl,
           resources: this.database.listSkillResources(skill.id),
         };
+      }
+      case "coworkers.list": {
+        schemas["coworkers.list"].parse(rawArgs);
+        if (!this.actions.peers) throw new Error("Coworker messaging is unavailable");
+        return { coworkers: this.actions.peers.roster(coworker.id) };
+      }
+      case "coworkers.send_message": {
+        const args = schemas["coworkers.send_message"].parse(rawArgs);
+        if (!this.actions.peers) throw new Error("Coworker messaging is unavailable");
+        const task = this.database.getTask(toolCall.taskId);
+        const to = this.actions.peers.resolveTarget(args.coworker, coworker.id);
+        const sent = this.actions.peers.send({
+          from: coworker,
+          to,
+          content: args.message,
+          originThreadId: task.threadId,
+          originTaskId: task.id,
+          expectReply: args.expectReply,
+        });
+        return {
+          delivered: true,
+          to: { id: to.id, name: to.name },
+          expectReply: args.expectReply,
+          depth: sent.depth,
+          note: args.expectReply
+            ? `${to.name} will work on it in their own conversation; their result arrives later as a follow-up in this conversation.`
+            : `${to.name} will work on it in their own conversation; no reply will be sent back to you.`,
+        };
+      }
+      case "coworkers.activity": {
+        const args = schemas["coworkers.activity"].parse(rawArgs);
+        if (!this.actions.peers) throw new Error("Coworker messaging is unavailable");
+        const target = args.coworker
+          ? this.actions.peers.resolveTarget(args.coworker, coworker.id)
+          : undefined;
+        return this.actions.peers.activity({
+          excludeCoworkerId: coworker.id,
+          coworkerId: target?.id,
+          sinceHours: args.sinceHours,
+        });
       }
       case "web.search": {
         const args = schemas["web.search"].parse(rawArgs);

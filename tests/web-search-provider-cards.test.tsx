@@ -43,7 +43,7 @@ describe("web search credentials", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Skills" }));
+    fireEvent.click(screen.getByRole("button", { name: "Web search" }));
     expect(screen.queryByRole("combobox", { name: "Search provider" })).toBeNull();
 
     const exa = screen.getByRole("button", { name: "Exa Not connected" });

@@ -60,19 +60,19 @@ async function sendCoworkerTelegramMessageUnchecked(input: {
   if ((input.integrationName && input.integrationName !== selected.name) || (input.integrationDestination && input.integrationDestination !== selected.destination) || (input.integrationBinding && JSON.stringify(input.integrationBinding) !== JSON.stringify(currentBinding))) throw new Error("The selected Telegram connection changed while approval was pending. Ask for approval again.");
   if (!integration || integration.status !== "connected") {
     throw new Error(
-      "Telegram is not connected. Ask the user to connect it in Settings → Integrations.",
+      "Telegram is not connected. Ask the user to connect it in Settings → Channels.",
     );
   }
   const config = parseTelegramConfig(integration);
   if (config.chatId === null) {
     throw new Error(
-      "Telegram is connected but no chat is paired yet. Ask the user to open the pairing link in Settings → Integrations.",
+      "Telegram is connected but no chat is paired yet. Ask the user to open the pairing link in Settings → Channels.",
     );
   }
   const token = await input.credentials.get(integration.credentialKey ?? telegramCredentialKey);
   if (!token) {
     throw new Error(
-      "The Telegram bot token is missing. Ask the user to reconnect Telegram in Settings → Integrations.",
+      "The Telegram bot token is missing. Ask the user to reconnect Telegram in Settings → Channels.",
     );
   }
 

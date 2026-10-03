@@ -42,11 +42,31 @@ export const remoteModelProviderSchema = z.union([
 ]);
 export const sharedFolderPathSchema = z.string().trim().min(1).max(1_000);
 
+export const coworkerTagSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1)
+  .max(24)
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N} _-]*$/u, "Tags may contain letters, numbers, spaces, - and _");
+export const coworkerTagsSchema = z
+  .array(coworkerTagSchema)
+  .max(10)
+  .transform((tags) => [...new Set(tags)]);
+
+export const maxAvatarImageLength = 150_000;
+export const avatarImageSchema = z
+  .string()
+  .max(maxAvatarImageLength, "Photo is too large")
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/, "Photo must be a PNG, JPEG, or WebP image");
+
 export const createCoworkerSchema = z.object({
   name: z.string().trim().min(1).max(80),
   role: z.string().trim().min(1).max(120),
   description: optionalText,
   avatarIndex: z.number().int().min(0).max(8).optional(),
+  avatarImage: avatarImageSchema.optional(),
+  tags: coworkerTagsSchema.optional(),
   systemPrompt: z.string().trim().min(1).max(50_000),
   modelProvider: modelProviderSchema,
   modelName: z.string().trim().min(1).max(160),
@@ -61,6 +81,8 @@ export const updateCoworkerSchema = createCoworkerSchema
   .extend({
     description: z.string().trim().max(10_000).nullable().optional(),
     status: z.enum(["active", "paused"]).optional(),
+    avatarImage: avatarImageSchema.nullable().optional(),
+    isPrimary: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
@@ -343,8 +365,10 @@ export const addModelEndpointSchema = z.object({
   defaultModelName: z.string().trim().min(1).max(160).optional(),
 });
 
+export const webSearchProviderSchema = z.enum(webSearchProviders);
+
 export const configureWebSearchSchema = z.object({
-  provider: z.enum(webSearchProviders),
+  provider: webSearchProviderSchema,
   apiKey: z.string().trim().min(1).max(2_000),
 });
 

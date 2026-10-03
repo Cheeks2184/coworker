@@ -23,6 +23,8 @@ const coworker: Coworker = {
   workspacePath: "/tmp/ava",
   enabledTools: [],
   enabledSkillIds: [],
+  isPrimary: false,
+  tags: [],
   policies: {},
   sharedFolders: [{ path: "/Users/melvin/Reports", alias: "Reports" }],
   createdAt: "2026-08-24T00:00:00.000Z",

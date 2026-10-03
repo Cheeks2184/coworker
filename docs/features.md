@@ -13,6 +13,15 @@ Coworker is a local-first Electron app for independent AI coworkers. Each cowork
 - Image attachments via picker or drag-and-drop, sent to vision-capable models
 - Searchable live model catalogs with OpenRouter pricing and quick per-coworker model switching
 
+## Team collaboration
+
+- **Primary coworker.** Mark one coworker as primary in its settings. It acts as chief of staff: a single point of contact that routes requests to the right specialist, coordinates multi-coworker work, and reports back in one conversation. Only one coworker can be primary; promoting another moves the role. Behavior comes from the bundled `primary-coordinator` skill, which is enabled only on the primary.
+- **Team digest.** A primary coworker gets a daily "Team digest" schedule, and is the default assignee on the Home page, (09:00, editable on the Schedules page) that summarizes what the other coworkers did and surfaces anything needing your attention. You can also ask it "what's going on?" at any time. Turning the role off disables the schedule.
+- **Messaging between coworkers.** Every coworker has the bundled `coworker-messaging` skill (`coworkers.list`, `coworkers.send_message`). Messages are asynchronous. The target does the work in one standing conversation per requester in their own chat history ("From Ava"), so earlier requests stay together and give them context. Open it from their history or the Activity entry. When they finish, the sender gets a follow-up and reports a short summary back in its own conversation; the full work is not pasted. If a coworker consults someone else while answering, its later answer is forwarded to the original sender too. Nesting is limited to 3 levels (A asks B asks C asks D); asking several coworkers one after another doesn't count against it. There's also a limit of 30 requests per pair per hour, and no self-messaging. Unanswered requests are delivered after a restart, and cancelled or failed requests report back instead of leaving the sender waiting.
+- **Tagging in chat.** Type `@` in any direct chat to tag another active coworker. The tagged coworker works on your message in their own conversation, and the chat's coworker summarizes the result back in your chat when they're done. The chat's coworker only answers the message itself if you tag it too. Images can't be sent with tagged messages yet.
+- **Photos.** Upload a photo for any coworker when creating it or in its settings (PNG, JPEG, or WebP up to 10 MB; stored locally, cropped to a 256 px square). Removing it restores the bundled avatar.
+- **Tags and search.** Give coworkers up to 10 tags. The Coworkers page has a search box (name, role, description, tags; `#tag` matches tags only) and clickable tag filters.
+
 ## Appearance
 
 - Light, Dark, and System modes, independent of the selected color theme
@@ -47,7 +56,7 @@ See the [memory guide](memory.md) for examples, limits, and privacy details.
 - Invoice creation
 - Document export to PDF, Word DOCX, Excel XLSX, and CSV from semantic Markdown
 - Email drafts (`.eml` outbox by default) and approval-gated sending via Resend
-- Web search with Tavily, Exa, Firecrawl, and SerpAPI credential fallback
+- Web search with Tavily, Exa, Firecrawl, and SerpAPI credential fallback, working without a key on Firecrawl's free tier
 
 ## Skills
 
@@ -93,6 +102,6 @@ On upgrade, existing bots stay paired and future messages start in fresh bot-spe
 
 ### Messaging configuration
 
-Each coworker can connect one Telegram bot and one Discord bot. Configure them in the coworker’s settings or in the global **Settings → Integrations** page; both views manage the same connections. Messaging changes save independently of the coworker’s other settings. Unpairing keeps the platform slot occupied; disconnecting frees it. Conversations started on desktop remain local, while conversations started through a bot sync with that bot.
+Each coworker can connect one Telegram bot and one Discord bot. Configure them in the coworker’s settings or in the global **Settings → Channels** page; both views manage the same connections. Messaging changes save independently of the coworker’s other settings. Unpairing keeps the platform slot occupied; disconnecting frees it. Conversations started on desktop remain local, while conversations started through a bot sync with that bot.
 
 If an older profile has several active bots on the same platform for one coworker, the upgrade pauses those conflicting connections and keeps their credentials, pairings, and history. Reconnect the desired bot or move a bot to a coworker with a free slot. Reconnecting a paused bot can reuse its stored token; explicitly disconnecting it removes that token.

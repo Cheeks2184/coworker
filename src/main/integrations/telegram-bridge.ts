@@ -613,7 +613,7 @@ export class TelegramBridgeService {
     if (!payload || payload !== config.pairingCode) {
       await this.sendPlain(
         chatId,
-        "This bot is private. To connect, open the pairing link from Coworker's Settings → Integrations — or paste the pairing code shown there as a message.",
+        "This bot is private. To connect, open the pairing link from Coworker's Settings → Channels — or paste the pairing code shown there as a message.",
       );
       return;
     }
@@ -640,12 +640,12 @@ export class TelegramBridgeService {
     this.options.database.addActivity({
       type: "telegram.refused",
       summary:
-        "Refused a Telegram message from an unpaired chat — open the pairing link or send the pairing code from Settings → Integrations",
+        "Refused a Telegram message from an unpaired chat — open the pairing link or send the pairing code from Settings → Channels",
     });
     this.options.emit({ type: "entity.changed", entity: "activity" });
     await this.sendPlain(
       chatId,
-      "This bot is private. To connect, open the pairing link from Coworker's Settings → Integrations — or paste the pairing code shown there as a message.",
+      "This bot is private. To connect, open the pairing link from Coworker's Settings → Channels — or paste the pairing code shown there as a message.",
     );
   }
 

@@ -184,7 +184,7 @@ export async function remoteCommand(command: CliCommand, apiKey?: string, curren
   }
   if (name === "models default") return args.length ? request(ipc.integrationsConfigureModel,
     { provider: args[0], defaultModelName: args[1] }) : request(ipc.getSettings);
-  if (name === "models credentials remove") return request(ipc.integrationsRemoveCredential, `model:${args[0]}`);
+  if (name === "models credentials remove") return request(ipc.integrationsDisconnectModel, args[0]);
   if (name === "coworkers create") return request(ipc.coworkersCreate, await inputObject(command));
   if (name === "coworkers update") return request(ipc.coworkersUpdate, args[0], await inputObject(command));
   if (name === "schedules create") return request(ipc.schedulesCreate, await inputObject(command));

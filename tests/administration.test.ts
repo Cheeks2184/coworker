@@ -104,6 +104,22 @@ describe("shared desktop and terminal administration", () => {
     expect(await credentials.get("model:openai")).toBeNull();
   });
 
+  it("disconnects model and web search providers and records it in activity", async () => {
+    const { admin, credentials, service } = await fixture();
+    await credentials.set("model:openai", "test-private-key");
+    await credentials.set("web-search:firecrawl", "fc-test");
+
+    await admin.invoke(ipc.integrationsDisconnectModel, ["openai"]);
+    await admin.invoke(ipc.integrationsDisconnectWebSearch, ["firecrawl"]);
+
+    expect(await credentials.get("model:openai")).toBeNull();
+    expect(await credentials.get("web-search:firecrawl")).toBeNull();
+    expect(service.database.listActivity().map((item) => item.type)).toEqual(
+      expect.arrayContaining(["model.disconnected", "web-search.disconnected"]),
+    );
+    await expect(admin.invoke(ipc.integrationsDisconnectWebSearch, ["bing"])).rejects.toThrow();
+  });
+
   it("installs and assigns skills through existing package and coworker operations", async () => {
     const { service, admin } = await fixture();
     const coworker = service.database.listCoworkers()[0]!;

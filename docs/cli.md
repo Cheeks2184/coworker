@@ -149,7 +149,7 @@ coworker coworkers update COWORKER_ID --provider openai --model MODEL_ID
 coworker coworkers update COWORKER_ID --status paused
 ```
 
-`--prompt-key` hides input. Scripts may pipe a key from their secret manager to `--key-stdin`. API-key values are never accepted as flags or returned by credential-status commands. Omit both key flags to reuse the saved credential. Provider configuration verifies connectivity and model availability using the same service as the desktop. Custom provider IDs can be used as global defaults.
+`--prompt-key` hides input. Scripts may pipe a key from their secret manager to `--key-stdin`. API-key values are never accepted as flags or returned by credential-status commands. Omit both key flags to reuse the saved credential. Provider configuration verifies connectivity and model availability using the same service as the desktop. Custom provider IDs can be used as global defaults. `models credentials remove` disconnects a built-in provider like Settings does: it forgets the key and base URL, restarts coworkers on that provider, and clears it as the global default.
 
 Create a coworker with `coworker coworkers create --file coworker.json`:
 

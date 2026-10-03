@@ -59,19 +59,19 @@ async function sendCoworkerDiscordMessageUnchecked(input: {
   if ((input.integrationName && input.integrationName !== selected.name) || (input.integrationDestination && input.integrationDestination !== selected.destination) || (input.integrationBinding && JSON.stringify(input.integrationBinding) !== JSON.stringify(currentBinding))) throw new Error("The selected Discord connection changed while approval was pending. Ask for approval again.");
   if (!integration || integration.status !== "connected") {
     throw new Error(
-      "Discord is not connected. Ask the user to connect it in Settings → Integrations.",
+      "Discord is not connected. Ask the user to connect it in Settings → Channels.",
     );
   }
   const config = parseDiscordConfig(integration);
   if (!config.channelId) {
     throw new Error(
-      "Discord is connected but no channel is paired yet. Ask the user to post the pairing code from Settings → Integrations.",
+      "Discord is connected but no channel is paired yet. Ask the user to post the pairing code from Settings → Channels.",
     );
   }
   const token = await input.credentials.get(integration.credentialKey ?? discordCredentialKey);
   if (!token) {
     throw new Error(
-      "The Discord bot token is missing. Ask the user to reconnect Discord in Settings → Integrations.",
+      "The Discord bot token is missing. Ask the user to reconnect Discord in Settings → Channels.",
     );
   }
 

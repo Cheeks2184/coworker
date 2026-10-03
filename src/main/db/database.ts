@@ -7,9 +7,12 @@ import {
   asc,
   desc,
   eq,
+  gte,
   inArray,
   isNotNull,
+  isNull,
   lte,
+  ne,
   sql,
 } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
@@ -19,6 +22,7 @@ import { appColorModes, appThemes, remoteModelProviders } from "@shared/contract
 import { isCustomModelProvider } from "@shared/model-providers";
 import type {
   ActivityItem,
+  PeerTask,
   AppSettings,
   Approval,
   ApprovalDecisionInput,
@@ -68,6 +72,7 @@ import {
   skills,
   taskCheckpoints,
   taskImageAttachments,
+  peerTasks,
   tasks,
   toolCalls,
 } from "./schema";
@@ -125,6 +130,9 @@ function coworkerFromRow(row: typeof coworkers.$inferSelect): Coworker {
     role: row.role,
     description: row.description,
     avatarIndex: row.avatarIndex,
+    avatarImage: row.avatarImage,
+    isPrimary: row.isPrimary,
+    tags: parseJson<string[]>(row.tagsJson, []),
     systemPrompt: row.systemPrompt,
     modelProvider: row.modelProvider as Coworker["modelProvider"],
     modelName: row.modelName,
@@ -639,6 +647,8 @@ export class CoworkerDatabase {
         role: input.role,
         description: input.description ?? null,
         avatarIndex: input.avatarIndex ?? null,
+        avatarImage: input.avatarImage ?? null,
+        tagsJson: json(input.tags ?? []),
         systemPrompt: input.systemPrompt,
         modelProvider: input.modelProvider,
         modelName: input.modelName,
@@ -673,6 +683,86 @@ export class CoworkerDatabase {
     return coworkerId
       ? result.filter((conversation) => conversation.memberIds.includes(coworkerId))
       : result;
+  }
+
+  /** Returns the conversation with this id, creating it if needed. New tasks un-archive it. */
+  findOrCreateDirectConversation(
+    id: string,
+    input: { coworkerId: string; title: string },
+  ): Conversation {
+    const existing = this.database
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, id))
+      .get();
+    if (!existing) return this.createConversation({ coworkerId: input.coworkerId, title: input.title }, id);
+    return this.getConversation(id);
+  }
+
+  createPeerTask(input: Omit<PeerTask, "createdAt" | "deliveredAt">): PeerTask {
+    this.database
+      .insert(peerTasks)
+      .values({ ...input, createdAt: now() })
+      .run();
+    return this.getPeerTask(input.taskId)!;
+  }
+
+  getPeerTask(taskId: string): PeerTask | null {
+    const row = this.database.select().from(peerTasks).where(eq(peerTasks.taskId, taskId)).get();
+    return row ?? null;
+  }
+
+  /** Records extra mentions on a stored message (idempotent). */
+  addMessageMentions(messageId: string, coworkerIds: string[]): void {
+    const existing = new Set(this.getMessage(messageId).mentionedCoworkerIds);
+    const fresh = [...new Set(coworkerIds)].filter((id) => !existing.has(id));
+    if (fresh.length === 0) return;
+    const timestamp = now();
+    this.database
+      .insert(messageMentions)
+      .values(fresh.map((coworkerId) => ({ messageId, coworkerId, createdAt: timestamp })))
+      .run();
+  }
+
+  listPeerTasks(): PeerTask[] {
+    return this.database.select().from(peerTasks).all();
+  }
+
+  listUndeliveredPeerTasks(): PeerTask[] {
+    return this.database.select().from(peerTasks).where(isNull(peerTasks.deliveredAt)).all();
+  }
+
+  /** Claims delivery exactly once; false means another caller already delivered it. */
+  claimPeerTaskDelivery(taskId: string): boolean {
+    return this.transaction(() => {
+      const row = this.database
+        .select()
+        .from(peerTasks)
+        .where(and(eq(peerTasks.taskId, taskId), isNull(peerTasks.deliveredAt)))
+        .get();
+      if (!row) return false;
+      this.database
+        .update(peerTasks)
+        .set({ deliveredAt: now() })
+        .where(eq(peerTasks.taskId, taskId))
+        .run();
+      return true;
+    });
+  }
+
+  countRecentPeerRequests(firstId: string, secondId: string, sinceIso: string): number {
+    return this.database
+      .select({ taskId: peerTasks.taskId })
+      .from(peerTasks)
+      .where(
+        and(
+          eq(peerTasks.kind, "request"),
+          gte(peerTasks.createdAt, sinceIso),
+          sql`((${peerTasks.fromCoworkerId} = ${firstId} AND ${peerTasks.toCoworkerId} = ${secondId})
+            OR (${peerTasks.fromCoworkerId} = ${secondId} AND ${peerTasks.toCoworkerId} = ${firstId}))`,
+        ),
+      )
+      .all().length;
   }
 
   searchConversations(coworkerId: string, query: string, limit = 100): Conversation[] {
@@ -956,6 +1046,9 @@ export class CoworkerDatabase {
     if (input.role !== undefined) patch.role = input.role;
     if (input.description !== undefined) patch.description = input.description;
     if (input.avatarIndex !== undefined) patch.avatarIndex = input.avatarIndex;
+    if (input.avatarImage !== undefined) patch.avatarImage = input.avatarImage;
+    if (input.tags !== undefined) patch.tagsJson = json(input.tags);
+    if (input.isPrimary !== undefined) patch.isPrimary = input.isPrimary;
     if (input.systemPrompt !== undefined) patch.systemPrompt = input.systemPrompt;
     if (input.modelProvider !== undefined) patch.modelProvider = input.modelProvider;
     if (input.modelName !== undefined) patch.modelName = input.modelName;
@@ -963,7 +1056,17 @@ export class CoworkerDatabase {
     if (input.enabledTools !== undefined) patch.enabledToolsJson = json(input.enabledTools);
     if (input.policies !== undefined) patch.policiesJson = json(input.policies);
     if (input.sharedFolders !== undefined) patch.sharedFoldersJson = json(input.sharedFolders);
-    this.database.update(coworkers).set(patch).where(eq(coworkers.id, id)).run();
+    // Single-primary invariant: promoting one coworker demotes the rest atomically.
+    this.transaction(() => {
+      if (input.isPrimary === true) {
+        this.database
+          .update(coworkers)
+          .set({ isPrimary: false })
+          .where(ne(coworkers.id, id))
+          .run();
+      }
+      this.database.update(coworkers).set(patch).where(eq(coworkers.id, id)).run();
+    });
     if (input.enabledSkillIds !== undefined) {
       this.setCoworkerSkills(id, input.enabledSkillIds);
     }

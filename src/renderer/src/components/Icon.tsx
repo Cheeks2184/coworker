@@ -9,6 +9,7 @@ export type IconName =
   | "settings"
   | "plus"
   | "arrow"
+  | "back"
   | "send"
   | "stop"
   | "open"
@@ -29,7 +30,11 @@ export type IconName =
   | "moon"
   | "monitor"
   | "palette"
-  | "copy";
+  | "copy"
+  | "reply"
+  | "pin"
+  | "alert"
+  | "close";
 
 const paths: Record<IconName, React.ReactNode> = {
   palette: (
@@ -77,6 +82,14 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="m9 18 6-6-6-6" />,
+  back: <path d="m15 18-6-6 6-6" />,
+  alert: (
+    <>
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </>
+  ),
+  close: <path d="M18 6 6 18M6 6l12 12" />,
   send: <path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />,
   stop: <rect x="7" y="7" width="10" height="10" rx="1" />,
   open: (
@@ -96,6 +109,18 @@ const paths: Record<IconName, React.ReactNode> = {
       <rect x="3" y="4" width="18" height="5" rx="1" />
       <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
       <path d="M10 13h4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
+  reply: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v5" />
     </>
   ),
   copy: (

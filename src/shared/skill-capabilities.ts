@@ -1,6 +1,8 @@
 export const skillToolCapabilities = {
   "coworker-memory": ["files.read", "files.edit", "files.write"],
   "web-search": ["web.search"],
+  "coworker-messaging": ["coworkers.list", "coworkers.send_message"],
+  "primary-coordinator": ["coworkers.list", "coworkers.send_message", "coworkers.activity"],
   "browser-control": [
     "browser.start_session",
     "browser.inspect",
@@ -15,6 +17,7 @@ export const defaultEnabledBundledSkillNames = new Set([
   "web-search",
   "document-authoring",
   "team-channel-collaboration",
+  "coworker-messaging",
   "folder-access",
   "telegram-messaging",
   "discord-messaging",

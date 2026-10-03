@@ -1,5 +1,6 @@
 import { CronExpressionParser } from "cron-parser";
 import type { Schedule } from "./contracts";
+import { formatClockTime } from "./time";
 
 /**
  * Schedules are stored as cron expressions, but nobody should have to write
@@ -239,20 +240,14 @@ export function toLocalInputValue(iso: string): string {
 }
 
 export function formatDateTime(date: Date): string {
-  return date.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatClockTime(date, { weekday: "short", month: "short", day: "numeric" });
 }
 
 function formatTime(time: string): string {
   const [hour, minute] = splitTime(time);
   const date = new Date();
   date.setHours(Number(hour), Number(minute), 0, 0);
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return formatClockTime(date);
 }
 
 function splitTime(time: string): [string, string] {

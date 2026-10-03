@@ -70,6 +70,11 @@ export const coworkers = sqliteTable(
     enabledToolsJson: text("enabled_tools_json").notNull().default("[]"),
     policiesJson: text("policies_json").notNull().default("{}"),
     sharedFoldersJson: text("shared_folders_json").notNull().default("[]"),
+    // At most one coworker is primary (the orchestrator); enforced in the database layer.
+    isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+    tagsJson: text("tags_json").notNull().default("[]"),
+    // Uploaded photo as a small (256px) image data URL; null uses the bundled avatar.
+    avatarImage: text("avatar_image"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -183,6 +188,49 @@ export const discussionSessions = sqliteTable(
       sql`${table.updatedAt} desc`,
     ),
     uniqueIndex("discussion_sessions_source_message_idx").on(table.sourceMessageId),
+  ],
+);
+
+// Links a task to the coworker-to-coworker request (or reply follow-up) that
+// created it, so completion can deliver the answer and hop depth stays bounded.
+export const peerTasks = sqliteTable(
+  "peer_tasks",
+  {
+    taskId: text("task_id")
+      .primaryKey()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["request", "reply"] }).notNull(),
+    // Null when the human sent the message (an @mention in a chat).
+    fromCoworkerId: text("from_coworker_id").references(() => coworkers.id, {
+      onDelete: "cascade",
+    }),
+    toCoworkerId: text("to_coworker_id")
+      .notNull()
+      .references(() => coworkers.id, { onDelete: "cascade" }),
+    // Where the answer is posted.
+    originThreadId: text("origin_thread_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    // When set, the answer also becomes a follow-up task for this coworker.
+    replyToCoworkerId: text("reply_to_coworker_id").references(() => coworkers.id, {
+      onDelete: "cascade",
+    }),
+    // The sender's task that issued the request. A follow-up continues that
+    // task, so if it was itself answering a peer, the follow-up's output is
+    // forwarded to that peer too.
+    originTaskId: text("origin_task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
+    // Nesting level: 0 is work started by the user, a request is one deeper
+    // than the task that sent it, and a follow-up returns to the sender's level.
+    depth: integer("depth").notNull(),
+    createdAt: text("created_at").notNull(),
+    deliveredAt: text("delivered_at"),
+  },
+  (table) => [
+    check("peer_tasks_kind_check", sql`${table.kind} in ('request', 'reply')`),
+    check("peer_tasks_depth_check", sql`${table.depth} >= 0`),
+    index("peer_tasks_pair_idx").on(table.fromCoworkerId, table.toCoworkerId, table.createdAt),
   ],
 );
 

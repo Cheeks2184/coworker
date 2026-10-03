@@ -1,21 +1,39 @@
-import {
-  formatSkillsForSystemPrompt,
-  type Skill as PiSkill,
-} from "@earendil-works/pi-agent-core";
-
 export interface ModelSelectableSkill {
   name: string;
   description: string;
 }
 
+/** Pi's native skill listing; keep its wording and XML shape so skill selection behaves as in Pi. */
+function formatNativeSkillListing(skills: ModelSelectableSkill[]): string {
+  if (skills.length === 0) return "";
+  return [
+    "The following skills provide specialized instructions for specific tasks.",
+    "Read the full skill file when the task matches its description.",
+    "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+    "",
+    "<available_skills>",
+    ...skills.flatMap((skill) => [
+      "  <skill>",
+      `    <name>${escapeXml(skill.name)}</name>`,
+      `    <description>${escapeXml(skill.description)}</description>`,
+      `    <location>${escapeXml(`skill://${skill.name}/SKILL.md`)}</location>`,
+      "  </skill>",
+    ]),
+    "</available_skills>",
+  ].join("\n");
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export function formatModelSelectableSkills(skills: ModelSelectableSkill[]): string {
-  const piSkills: PiSkill[] = skills.map((skill) => ({
-    name: skill.name,
-    description: skill.description,
-    content: "",
-    filePath: `skill://${skill.name}/SKILL.md`,
-  }));
-  const nativePrompt = formatSkillsForSystemPrompt(piSkills);
+  const nativePrompt = formatNativeSkillListing(skills);
   if (!nativePrompt) return "";
   return [
     nativePrompt,

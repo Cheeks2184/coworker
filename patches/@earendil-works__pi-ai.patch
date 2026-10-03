@@ -1,8 +1,8 @@
 diff --git a/dist/api/openai-completions.js b/dist/api/openai-completions.js
-index c5a9f5da3f822a601091bb2ee8d2a30db41dd422..a18db803a1e28d59c18f5f4f86ab623090099385 100644
+index eecd83c..01a43f3 100644
 --- a/dist/api/openai-completions.js
 +++ b/dist/api/openai-completions.js
-@@ -375,6 +375,36 @@ export const stream = (model, context, options) => {
+@@ -423,6 +423,34 @@ export const stream = (model, context, options) => {
                              });
                          }
                      }
@@ -13,11 +13,9 @@ index c5a9f5da3f822a601091bb2ee8d2a30db41dd422..a18db803a1e28d59c18f5f4f86ab6230
 +                        // surface. Used as a fallback because routes that do send a
 +                        // string (e.g. DeepSeek) repeat the same text here.
 +                        //
-+                        // The signature is deliberately empty: thinkingSignature names
-+                        // the request field this text is echoed back in, and reasoning
-+                        // must not be echoed as a bare string into reasoning_details,
-+                        // which is where Gemini's encrypted thought signatures travel.
-+                        // Those are round-tripped separately, per tool call, below.
++                        // This only adds display text. The details are still collected
++                        // below and replayed verbatim as reasoning_details, which is
++                        // where Gemini's encrypted thought signatures travel.
 +                        const detailText = deltaFields.reasoning_details
 +                            .filter((detail) => typeof detail === "object" &&
 +                            detail !== null &&

@@ -57,7 +57,7 @@ describe("credentials encrypted under a previous app identity", () => {
     expect(banner.textContent).toContain("1 saved credential");
     expect(banner.textContent).toContain("Firecrawl web search key");
     // The Firecrawl key lives under Skills, not Models or Integrations.
-    expect(banner.textContent).toContain("Open Skills");
+    expect(banner.textContent).toContain("Open Web search");
   });
 
   it("discards the unreadable credential so the banner clears", async () => {
@@ -99,7 +99,7 @@ describe("credentials encrypted under a previous app identity", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Models" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "Model Providers" })).toBeTruthy(),
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });

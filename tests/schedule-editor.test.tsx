@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleEditorModal } from "@renderer/components/ScheduleEditorModal";
-import { approvalPreviewRows } from "@renderer/pages/CoworkerDetailPage";
+import { approvalPreviewRows } from "@renderer/lib/approval-preview";
 import type { Coworker, Schedule } from "@shared/contracts";
 
 const coworker: Coworker = {
@@ -19,6 +19,8 @@ const coworker: Coworker = {
   workspacePath: "/tmp/ava",
   enabledTools: [],
   enabledSkillIds: [],
+  isPrimary: false,
+  tags: [],
   policies: {},
   sharedFolders: [],
   createdAt: "2026-08-23T00:00:00.000Z",
