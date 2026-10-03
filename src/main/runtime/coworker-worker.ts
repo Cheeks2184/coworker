@@ -167,6 +167,25 @@ const parameterSchemas: Record<string, ReturnType<typeof Type.Object>> = {
       }),
     ),
   }),
+  "coworkers.list": Type.Object({}),
+  "coworkers.send_message": Type.Object({
+    coworker: Type.String({ description: "Id or exact name of the coworker to message" }),
+    message: Type.String({
+      description:
+        "Self-contained message: the coworker has no access to your conversation, so include the goal, needed context, and the format you want back",
+    }),
+    expectReply: Type.Optional(
+      Type.Boolean({
+        description: "Whether their answer should come back to you as a follow-up. Defaults to true.",
+      }),
+    ),
+  }),
+  "coworkers.activity": Type.Object({
+    coworker: Type.Optional(Type.String({ description: "Id or exact name; omit for everyone" })),
+    sinceHours: Type.Optional(
+      Type.Integer({ minimum: 1, maximum: 168, description: "Look-back window, default 24" }),
+    ),
+  }),
   "web.search": Type.Object({
     query: Type.String({ description: "Focused web search query" }),
     limit: Type.Optional(Type.Number({ minimum: 1, maximum: 10 })),

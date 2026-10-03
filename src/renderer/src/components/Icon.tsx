@@ -29,7 +29,9 @@ export type IconName =
   | "moon"
   | "monitor"
   | "palette"
-  | "copy";
+  | "copy"
+  | "reply"
+  | "pin";
 
 const paths: Record<IconName, React.ReactNode> = {
   palette: (
@@ -96,6 +98,18 @@ const paths: Record<IconName, React.ReactNode> = {
       <rect x="3" y="4" width="18" height="5" rx="1" />
       <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
       <path d="M10 13h4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
+  reply: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v5" />
     </>
   ),
   copy: (

@@ -9,7 +9,7 @@ import { CoworkerSettingsModal } from "@renderer/components/CoworkerSettingsModa
 const coworker: Coworker = {
   id: "ava", name: "Ava", role: "Finance", description: null, systemPrompt: "Be useful.",
   modelProvider: "demo", modelName: "demo", status: "active", runtimeStatus: "IDLE",
-  workspacePath: "/tmp/ava", enabledTools: [], enabledSkillIds: [], policies: {}, sharedFolders: [],
+  workspacePath: "/tmp/ava", enabledTools: [], enabledSkillIds: [], isPrimary: false, tags: [], policies: {}, sharedFolders: [],
   createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
 };
 const other: Coworker = { ...coworker, id: "bea", name: "Bea" };

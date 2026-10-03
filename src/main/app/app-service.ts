@@ -13,6 +13,7 @@ import type {
   ApprovalStatus,
   ConfigureModelResult,
   Conversation,
+  ConversationDispatchReceipt,
   CreateConversationInput,
   CreateCoworkerInput,
   CreateScheduleInput,
@@ -60,6 +61,7 @@ import {
   type CredentialStore,
 } from "@main/security/credential-store";
 import { SchedulerService } from "@main/scheduler/scheduler-service";
+import { PeerMessaging, maxPeerMessageLength } from "./peer-messaging";
 import { resolveSharedFolderGrants } from "@main/tools/shared-folders";
 import { ToolGateway } from "@main/tools/tool-gateway";
 import { CoworkerRuntimeManager } from "@main/runtime/runtime-manager";
@@ -136,6 +138,15 @@ function safeDirectoryName(name: string): string {
   );
 }
 
+const teamDigestName = "Team digest";
+
+/** "@Sarah thanks" reads as "thanks" once it is in Sarah's own conversation. */
+function withoutLeadingTag(content: string, name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = content.replace(new RegExp(`^@${escaped}(?!\\w)[\\s,:]*`, "i"), "");
+  return stripped.trim() ? stripped : content;
+}
+
 function taskTitle(text: string): string {
   const firstLine = text.split("\n")[0]?.trim() || "New task";
   return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
@@ -161,6 +172,7 @@ export class DesktopAppService {
   readonly discord: DiscordBridgeManager;
   readonly tools: ToolGateway;
   readonly browser: BrowserAutomationService;
+  readonly peers: PeerMessaging;
   readonly providerErrors: ProviderErrorLogger;
   private readonly listeners = new Set<(event: DesktopEvent) => void>();
   private initialized = false;
@@ -175,6 +187,12 @@ export class DesktopAppService {
       join(options.dataPath, "logs", "provider-errors.jsonl"),
     );
     this.browser = new BrowserAutomationService(options.dataPath);
+    this.peers = new PeerMessaging({
+      database: this.database,
+      enqueue: (coworkerId) => this.runtime.enqueueTask(coworkerId),
+      emit: (event) => this.emit(event),
+      onError: (scope, error) => void options.applicationLogger?.error(scope, error),
+    });
     this.tools = new ToolGateway(
       this.database,
       options.credentials,
@@ -182,6 +200,7 @@ export class DesktopAppService {
       {
         createSchedule: (input) => this.createSchedule(input),
         browser: this.browser,
+        peers: this.peers,
       },
       {
         dataPath: options.dataPath,
@@ -197,8 +216,14 @@ export class DesktopAppService {
       providerErrors: this.providerErrors,
       applicationErrors: options.applicationLogger,
       workerFactory: options.workerFactory,
-      onTaskCompleted: (task) => this.advanceDiscussion(task),
-      onTaskFailed: (task, error) => this.failDiscussion(task, error),
+      onTaskCompleted: async (task) => {
+        this.peers.handleTaskCompleted(task);
+        await this.advanceDiscussion(task);
+      },
+      onTaskFailed: async (task, error) => {
+        this.peers.handleTaskFailed(task, error);
+        await this.failDiscussion(task, error);
+      },
     });
     this.scheduler = new SchedulerService(this.database, async (task) => {
       this.emit({ type: "entity.changed", entity: "tasks", id: task.id });
@@ -268,6 +293,19 @@ export class DesktopAppService {
       }
       this.database.setMetadata("coworker-administration-skill-v1", "true");
     }
+    if (this.database.getMetadata("coworker-messaging-skill-v1") !== "true") {
+      const skill = this.database.getSkillByName("coworker-messaging");
+      if (skill) for (const coworker of this.database.listCoworkers()) {
+        this.database.setCoworkerSkills(coworker.id, [...new Set([...coworker.enabledSkillIds, skill.id])]);
+      }
+      this.database.setMetadata("coworker-messaging-skill-v1", "true");
+    }
+    try {
+      this.syncPrimaryCoordinator();
+    } catch (error) {
+      // Never let the optional digest block startup.
+      void this.options.applicationLogger?.error("primary-coordinator", error);
+    }
     this.enableDocumentExports();
     this.enableScheduleCreation();
     await this.options.onSettingsChanged?.(this.database.getSettings());
@@ -275,6 +313,7 @@ export class DesktopAppService {
     await this.telegram.start();
     await this.discord.start();
     await this.recoverDiscussions();
+    this.peers.recover();
     for (const coworker of this.database.listCoworkers()) {
       if (this.database.listTasks(coworker.id).some((task) => task.status === "QUEUED")) {
         this.runtime.enqueueTask(coworker.id);
@@ -299,12 +338,27 @@ export class DesktopAppService {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Tasks with their peer links: delegated work knows which thread asked for it
+   * (working indicators) and follow-ups know whose work they report ("Reply to").
+   */
+  private tasksWithPeerLinks() {
+    const links = new Map(this.database.listPeerTasks().map((peer) => [peer.taskId, peer]));
+    return this.database.listTasks().map((task) => {
+      const peer = links.get(task.id);
+      if (!peer) return task;
+      return peer.kind === "request"
+        ? { ...task, delegatedFromThreadId: peer.originThreadId }
+        : { ...task, replyFromCoworkerId: peer.fromCoworkerId };
+    });
+  }
+
   snapshot(): AppSnapshot {
     return {
       coworkers: this.database.listCoworkers(),
       conversations: this.database.listConversations(),
       discussions: this.database.listDiscussions(),
-      tasks: this.database.listTasks(),
+      tasks: this.tasksWithPeerLinks(),
       messages: this.database.listAllMessages(),
       imageAttachments: this.database.listImageAttachments().map((attachment) => ({
         id: attachment.id,
@@ -384,7 +438,16 @@ export class DesktopAppService {
         : await resolveSharedFolderGrants(input.sharedFolderPaths, {
             dataPath: this.options.dataPath,
           });
+    const primaryBefore = this.database.listCoworkers().find((item) => item.isPrimary)?.id;
     const coworker = this.database.updateCoworker(id, { ...input, sharedFolders });
+    if (input.isPrimary !== undefined) {
+      const changed = this.syncPrimaryCoordinator();
+      // A demoted coworker loses the coordinator skill, so its runtime must restart too.
+      if (primaryBefore && primaryBefore !== id && changed.includes(primaryBefore)) {
+        await this.runtime.stop(primaryBefore);
+        this.emit({ type: "entity.changed", entity: "coworkers", id: primaryBefore });
+      }
+    }
     if (this.runtime) await this.runtime.stop(id);
     this.browser.releaseCoworker(id);
     if (coworker.status === "active") this.runtime.enqueueTask(id);
@@ -412,6 +475,55 @@ export class DesktopAppService {
     });
     this.emit({ type: "entity.changed", entity: "activity" });
     return { path, content, revision };
+  }
+
+  /**
+   * Keeps everything derived from "who is primary" consistent: only the primary
+   * carries the coordinator skill and has its recurring team digest enabled.
+   * Idempotent; returns the ids of coworkers whose skills changed.
+   */
+  private syncPrimaryCoordinator(): string[] {
+    const skill = this.database.getSkillByName("primary-coordinator");
+    if (!skill) return [];
+    const changed: string[] = [];
+    for (const coworker of this.database.listCoworkers()) {
+      const has = coworker.enabledSkillIds.includes(skill.id);
+      if (coworker.isPrimary && !has) {
+        this.database.setCoworkerSkills(coworker.id, [...coworker.enabledSkillIds, skill.id]);
+        changed.push(coworker.id);
+      } else if (!coworker.isPrimary && has) {
+        this.database.setCoworkerSkills(
+          coworker.id,
+          coworker.enabledSkillIds.filter((skillId) => skillId !== skill.id),
+        );
+        changed.push(coworker.id);
+      }
+      const digest = this.database
+        .listSchedules()
+        .find((schedule) => schedule.coworkerId === coworker.id && schedule.name === teamDigestName);
+      if (coworker.isPrimary && !digest) {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        this.createSchedule({
+          coworkerId: coworker.id,
+          // Null follows the coworker's default thread, which is recreated if deleted.
+          conversationId: null,
+          name: teamDigestName,
+          scheduleType: "cron",
+          cronExpression: "0 9 * * *",
+          timezone,
+          taskTemplate: {
+            title: "Team digest",
+            input:
+              "Run the team digest: use the primary-coordinator skill to review what the other coworkers did recently and post a short summary for me. Lead with anything that needs my attention.",
+          },
+          enabled: true,
+        });
+      } else if (digest && digest.enabled !== coworker.isPrimary) {
+        // Keep the user's edits to the schedule; only toggle it with the role.
+        this.updateSchedule(digest.id, { enabled: coworker.isPrimary });
+      }
+    }
+    return changed;
   }
 
   async removeCoworker(id: string): Promise<void> {
@@ -502,7 +614,9 @@ export class DesktopAppService {
     this.emit({ type: "entity.changed", entity: "activity" });
   }
 
-  async sendConversationMessage(input: SendConversationMessageInput) {
+  async sendConversationMessage(
+    input: SendConversationMessageInput,
+  ): Promise<ConversationDispatchReceipt> {
     let conversation = this.database.getConversation(input.conversationId);
     if (conversation.archivedAt) {
       // New activity brings an archived conversation back, so messages
@@ -547,6 +661,12 @@ export class DesktopAppService {
     }
 
     const mentionedCoworkerIds = [...new Set(input.mentionedCoworkerIds)];
+    if (
+      conversation.kind === "direct" &&
+      mentionedCoworkerIds.some((id) => !conversation.memberIds.includes(id))
+    ) {
+      return this.sendTaggedMessage(conversation, input, mentionedCoworkerIds);
+    }
     const ongoingDiscussion =
       conversation.kind === "group"
         ? this.database
@@ -688,6 +808,83 @@ export class DesktopAppService {
       );
       throw error;
     }
+  }
+
+  /**
+   * A human tagged other coworkers in a direct chat. Each tagged coworker does
+   * the work in their own conversation; when they finish, the chat's coworker
+   * gets their result and reports back here. The chat's coworker also answers
+   * the message itself only when it is tagged too.
+   */
+  private async sendTaggedMessage(
+    conversation: Conversation,
+    input: SendConversationMessageInput,
+    mentionedCoworkerIds: string[],
+  ): Promise<ConversationDispatchReceipt> {
+    if (input.images && input.images.length > 0) {
+      throw new Error("Images cannot be sent to tagged coworkers yet");
+    }
+    const owner = this.database.getCoworker(conversation.memberIds[0]!);
+    const others = mentionedCoworkerIds
+      .filter((id) => id !== owner.id)
+      .map((id) => this.database.getCoworker(id));
+    const paused = others.find((coworker) => coworker.status !== "active");
+    if (paused) throw new Error(`${paused.name} is paused`);
+    const content = input.content.trim();
+    if (!content) throw new Error("A message is required to tag a coworker");
+    // Validate before writing so a message is never stored without being delivered.
+    if (others.length > 0 && content.length > maxPeerMessageLength) {
+      throw new Error(
+        `Messages to tagged coworkers are limited to ${maxPeerMessageLength.toLocaleString()} characters`,
+      );
+    }
+    const sendToOthers = () => {
+      for (const target of others) {
+        this.peers.send({
+          from: null,
+          via: owner,
+          to: target,
+          content: withoutLeadingTag(content, target.name),
+          originThreadId: conversation.id,
+          // The chat's own coworker reports the outcome back here.
+          expectReply: owner.status === "active",
+        });
+      }
+    };
+
+    if (mentionedCoworkerIds.includes(owner.id)) {
+      const result = await this.sendConversationMessage({
+        ...input,
+        mentionedCoworkerIds: [owner.id],
+      });
+      // Store every tag so a retry with the same message id matches and is a no-op.
+      this.database.addMessageMentions(result.message.id, mentionedCoworkerIds);
+      sendToOthers();
+      return { ...result, message: this.database.getMessage(result.message.id) };
+    }
+    const message = this.database.transaction(() => {
+      // No task runs in this conversation, so name it here; otherwise the first
+      // follow-up's title ("Reply from …") would become its name.
+      if (conversation.title === "New conversation") {
+        this.database.updateConversation(conversation.id, { title: taskTitle(content) });
+      }
+      const created = this.database.addMessage(
+        {
+          conversationId: conversation.id,
+          coworkerId: null,
+          authorName: "You",
+          taskId: null,
+          role: "user",
+          content: input.content,
+          mentionedCoworkerIds,
+        },
+        input.clientMessageId,
+      );
+      sendToOthers();
+      return created;
+    });
+    this.emit({ type: "entity.changed", entity: "conversations", id: conversation.id });
+    return { message, runs: [], discussion: null };
   }
 
   private async interjectInDiscussion(
@@ -1014,6 +1211,8 @@ export class DesktopAppService {
     await this.runtime.abort(task.coworkerId, task.runId);
     this.browser.releaseTask(task.id);
     const cancelled = this.database.cancelTask(id);
+    // Uses the task's real status: cancelling an already-finished task must not report a cancellation.
+    this.peers.handleTaskSettled(this.database.getTask(id));
     this.emit({ type: "entity.changed", entity: "tasks", id });
     this.emit({ type: "entity.changed", entity: "approvals" });
     this.emit({ type: "entity.changed", entity: "activity" });

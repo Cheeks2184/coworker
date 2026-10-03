@@ -5,6 +5,10 @@ export interface RequestContext {
   source: Task["source"];
   originatingIntegrationId?: string;
   eligibleConnections?: Array<{ id: string; name: string; destination: string }>;
+  /** True when this coworker is the user's primary (orchestrating) coworker. */
+  isPrimaryCoworker?: boolean;
+  /** Present for the primary coworker only: who else is on the team. */
+  teamRoster?: Array<{ id: string; name: string; role: string; tags: string[]; description: string | null }>;
 }
 
 /** Decode persisted transport identity, never message text or paired accounts.

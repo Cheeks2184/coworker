@@ -421,6 +421,21 @@ export class CoworkerRuntimeManager {
         input: task.input,
         requestContext: {
           ...requestContextForTask(task),
+          ...(coworker.isPrimary
+            ? {
+                isPrimaryCoworker: true,
+                teamRoster: this.options.database
+                  .listCoworkers()
+                  .filter((other) => other.id !== coworkerId && other.status === "active")
+                  .map(({ id, name, role, tags, description }) => ({
+                    id,
+                    name,
+                    role,
+                    tags,
+                    description: description && description.length > 200 ? `${description.slice(0, 199)}…` : description,
+                  })),
+              }
+            : {}),
           eligibleConnections: ["telegram", "discord"].flatMap((provider) =>
             messagingCandidates(this.options.database, provider as "telegram" | "discord", coworkerId).map(({ id, name, destination }) => ({ id, name, destination })),
           ),

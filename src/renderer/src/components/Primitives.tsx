@@ -59,7 +59,10 @@ export function CoworkerAvatar({
   coworker,
   className = "",
 }: {
-  coworker: Pick<Coworker, "id" | "name"> & { avatarIndex?: number | null };
+  coworker: Pick<Coworker, "id" | "name"> & {
+    avatarIndex?: number | null;
+    avatarImage?: string | null;
+  };
   className?: string;
 }) {
   const visual = coworkerAvatarVisual(coworker.avatarIndex ?? avatarIndex(coworker.id));
@@ -70,7 +73,7 @@ export function CoworkerAvatar({
       role="img"
       style={{ backgroundColor: visual.color }}
     >
-      <img alt="" src={visual.image} />
+      <img alt="" src={coworker.avatarImage || visual.image} />
     </span>
   );
 }

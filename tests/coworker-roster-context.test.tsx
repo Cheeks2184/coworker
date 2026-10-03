@@ -20,6 +20,8 @@ const coworker: Coworker = {
   workspacePath: "/tmp/ava",
   enabledTools: [],
   enabledSkillIds: [],
+  isPrimary: false,
+  tags: [],
   policies: {},
   sharedFolders: [],
   createdAt: "2026-08-24T00:00:00.000Z",
@@ -40,10 +42,16 @@ describe("coworker roster context actions", () => {
       />,
     );
 
-    const item = screen.getByRole("button", { name: /Ava/ });
+    const item = screen
+      .getAllByRole("button", { name: /Ava/ })
+      .find((element) => element.classList.contains("conversation-roster-item"))!;
     fireEvent.contextMenu(item, { clientX: 120, clientY: 180 });
     expect(onOpenContextMenu).toHaveBeenCalledWith({ x: 120, y: 180 });
     fireEvent.click(item);
+    expect(onSelect).toHaveBeenCalledOnce();
+    // The visible ⋯ button opens the same menu without selecting the coworker.
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Ava" }));
+    expect(onOpenContextMenu).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenCalledOnce();
   });
 });

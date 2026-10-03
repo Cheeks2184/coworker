@@ -4,6 +4,9 @@ import { Icon } from "./Icon";
 import { ModalPortal } from "./ModalPortal";
 import { ModelSelector } from "./ModelSelector";
 import { ProviderSelect } from "./ProviderSelect";
+import { TagInput } from "./TagInput";
+import { AvatarPhotoControl } from "./AvatarPhotoControl";
+import { CoworkerAvatar } from "./Primitives";
 import { CoworkerMemoryEditor } from "./CoworkerMemoryEditor";
 import { CoworkerMessagingSettings } from "./CoworkerMessagingSettings";
 
@@ -45,6 +48,9 @@ export function CoworkerSettingsModal({
     coworker.modelProvider === "demo" ? "" : coworker.modelName,
   );
   const [enabledSkillIds, setEnabledSkillIds] = useState(coworker.enabledSkillIds);
+  const [tags, setTags] = useState(coworker.tags);
+  const [avatarImage, setAvatarImage] = useState<string | null>(coworker.avatarImage ?? null);
+  const [isPrimary, setIsPrimary] = useState(coworker.isPrimary);
   const [sharedFolderPaths, setSharedFolderPaths] = useState(
     coworker.sharedFolders.map((folder) => folder.path),
   );
@@ -109,6 +115,9 @@ export function CoworkerSettingsModal({
         description: String(data.get("description") ?? "").trim() || null,
         systemPrompt: String(data.get("systemPrompt") ?? "").trim(),
         status: String(data.get("status")) as Coworker["status"],
+        tags,
+        avatarImage,
+        isPrimary,
         enabledSkillIds,
         sharedFolderPaths,
         ...modelPatch,
@@ -150,6 +159,11 @@ export function CoworkerSettingsModal({
         <h2 id="coworker-settings-title">Manage {coworker.name}</h2>
         <p>Changes restart this coworker’s isolated runtime. Queued work remains durable.</p>
         <form className="form-stack" onSubmit={save}>
+          <div className="avatar-picker">
+            <span>Photo</span>
+            <CoworkerAvatar className="large-avatar" coworker={{ ...coworker, avatarImage }} />
+            <AvatarPhotoControl disabled={working} onChange={setAvatarImage} photo={avatarImage} />
+          </div>
           <div className="form-split">
             <label>
               <span>Name</span>
@@ -164,14 +178,35 @@ export function CoworkerSettingsModal({
             <span>Description</span>
             <textarea defaultValue={coworker.description ?? ""} maxLength={10_000} name="description" rows={2} />
           </label>
+          <label>
+            <span>Tags</span>
+            <TagInput disabled={working} onChange={setTags} tags={tags} />
+          </label>
+          <label className="checkbox-row">
+            <input
+              checked={isPrimary}
+              onChange={(event) => setIsPrimary(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              <strong>Primary coworker</strong>
+              <small>
+                Your single point of contact: it routes requests to other coworkers and
+                keeps you updated. Only one coworker can be primary.
+              </small>
+            </span>
+          </label>
           <fieldset className="skill-picker">
             <legend>Skills</legend>
             <small>Installed skills are global; choose which ones this coworker can use.</small>
-            {skills.map((skill) => (
+            {skills.map((skill) => {
+              // Granted and removed with the Primary role, not toggled by hand.
+              const roleManaged = skill.name === "primary-coordinator";
+              return (
               <label key={skill.id}>
                 <input
-                  checked={enabledSkillIds.includes(skill.id)}
-                  disabled={working}
+                  checked={roleManaged ? isPrimary : enabledSkillIds.includes(skill.id)}
+                  disabled={working || roleManaged}
                   onChange={(event) =>
                     setEnabledSkillIds((current) =>
                       event.target.checked
@@ -183,10 +218,14 @@ export function CoworkerSettingsModal({
                 />
                 <span>
                   <strong>{skill.name}</strong>
-                  <small>{skill.description}</small>
+                  <small>
+                    {roleManaged ? "Follows the Primary coworker setting above. " : ""}
+                    {skill.description}
+                  </small>
                 </span>
               </label>
-            ))}
+              );
+            })}
           </fieldset>
           <CoworkerMemoryEditor key={coworker.id} coworkerId={coworker.id} name={coworker.name} disabled={working} onDirtyChange={setMemoryDirty} />
           {skills.some(

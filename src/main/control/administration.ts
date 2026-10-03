@@ -4,6 +4,13 @@ import type { DesktopAppService } from "@main/app/app-service";
 import type { CredentialStore } from "@main/security/credential-store";
 import { modelProviderDefinitions } from "@shared/model-providers";
 import type { LoginStartup } from "@main/app/login-startup";
+import type { Coworker } from "@shared/contracts";
+
+/** The uploaded photo is tens of kilobytes of base64; CLI and model-facing output omit it. */
+function withoutPhoto(coworker: Coworker): Omit<Coworker, "avatarImage"> & { hasPhoto: boolean } {
+  const { avatarImage, ...rest } = coworker;
+  return { ...rest, hasPhoto: Boolean(avatarImage) };
+}
 
 const { addModelEndpointSchema, approvalDecisionSchema, approvalStatusSchema, configureModelSchema, createCoworkerSchema, createScheduleSchema, credentialKeySchema, idSchema, installSkillContentSchema, installSkillPackageSchema, installSkillUrlSchema, modelProviderSchema, remoteModelProviderSchema, settingsPatchSchema, updateCoworkerSchema, updateScheduleSchema } = validation;
 
@@ -49,14 +56,14 @@ export function createAdministration(input: {
       await input.service.updateSettings({ launchAtLogin: result.registered && result.selectedProfile });
       return result;
     }],
-    [ipcChannels.coworkersList, () => input.service.database.listCoworkers()],
-    [ipcChannels.coworkersCreate, (value) =>
-    input.service.createCoworker(createCoworkerSchema.parse(value))],
-    [ipcChannels.coworkersUpdate, (id, value) =>
-    input.service.updateCoworker(
+    [ipcChannels.coworkersList, () => input.service.database.listCoworkers().map(withoutPhoto)],
+    [ipcChannels.coworkersCreate, async (value) =>
+    withoutPhoto(await input.service.createCoworker(createCoworkerSchema.parse(value)))],
+    [ipcChannels.coworkersUpdate, async (id, value) =>
+    withoutPhoto(await input.service.updateCoworker(
       idSchema.parse(id),
       updateCoworkerSchema.parse(value),
-    )],
+    ))],
     [ipcChannels.coworkersRemove, (id) =>
     input.service.removeCoworker(idSchema.parse(id))],
     [ipcChannels.approvalsList, (status) =>
@@ -139,7 +146,7 @@ export function createAdministration(input: {
     ["discord.unpair", (id) => input.service.unpairDiscord(idSchema.parse(id))],
     ["discord.disconnect", (id) => input.service.disconnectDiscord(idSchema.parse(id))],
     ["activity.list", (limit) => input.service.database.listActivity(limit === undefined ? 50 : validation.listLimitSchema.parse(limit))],
-    ["coworkers.show", (id) => input.service.database.getCoworker(validation.idSchema.parse(id))],
+    ["coworkers.show", (id) => withoutPhoto(input.service.database.getCoworker(validation.idSchema.parse(id)))],
     ["skills.show", (id) => input.service.database.getSkill(validation.idSchema.parse(id))],
     ["schedules.show", (id) => input.service.database.getSchedule(validation.idSchema.parse(id))],
     ["approvals.show", (id) => input.service.database.getApproval(validation.idSchema.parse(id))],

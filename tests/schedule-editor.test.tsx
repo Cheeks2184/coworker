@@ -19,6 +19,8 @@ const coworker: Coworker = {
   workspacePath: "/tmp/ava",
   enabledTools: [],
   enabledSkillIds: [],
+  isPrimary: false,
+  tags: [],
   policies: {},
   sharedFolders: [],
   createdAt: "2026-08-23T00:00:00.000Z",

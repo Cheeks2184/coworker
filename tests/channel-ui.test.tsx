@@ -6,6 +6,7 @@ import {
   CreateGroupChannelModal,
   latestDirectConversation,
   mentionedCoworkerIdsInText,
+  mergeConversationMessages,
 } from "@renderer/pages/CoworkerDetailPage";
 import type { Conversation, Coworker, DesktopApi } from "@shared/contracts";
 
@@ -28,12 +29,33 @@ function coworker(id: string, name: string): Coworker {
     workspacePath: `/tmp/${id}`,
     enabledTools: [],
     enabledSkillIds: [],
+    isPrimary: false,
+    tags: [],
     policies: {},
     sharedFolders: [],
     createdAt: "2026-08-24T00:00:00.000Z",
     updatedAt: "2026-08-24T00:00:00.000Z",
   };
 }
+
+describe("conversation history merge", () => {
+  const message = (id: string, createdAt: string, conversationId = "c1") => ({
+    id, conversationId, coworkerId: null, authorName: "You", taskId: null, role: "user" as const,
+    content: id, createdAt, mentionedCoworkerIds: [],
+  });
+
+  it("adds messages persisted after the history was loaded, in order", () => {
+    const loaded = { conversationId: "c1", messages: [message("a", "2026-01-01T00:00:01Z")] };
+    const live = [message("a", "2026-01-01T00:00:01Z"), message("b", "2026-01-01T00:00:02Z")];
+    expect(mergeConversationMessages(loaded, live, "c1").map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the loaded copy while another conversation is still loading", () => {
+    const loaded = { conversationId: "c1", messages: [message("a", "2026-01-01T00:00:01Z")] };
+    expect(mergeConversationMessages(loaded, [message("x", "2026-01-01T00:00:02Z", "c2")], "c2").map((m) => m.id)).toEqual(["a"]);
+    expect(mergeConversationMessages(null, [message("x", "2026-01-01T00:00:02Z", "c2")], "c2").map((m) => m.id)).toEqual(["x"]);
+  });
+});
 
 describe("typed mentions", () => {
   const members = [

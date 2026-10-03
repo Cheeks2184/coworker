@@ -254,6 +254,16 @@ export const bundledBrowserControlSkill = loadBundledSkill(
   bundledBrowserControlSkillId,
 );
 
+export const bundledCoworkerMessagingSkill = loadBundledSkill(
+  "coworker-messaging",
+  "bundled:coworker-messaging",
+);
+
+export const bundledPrimaryCoordinatorSkill = loadBundledSkill(
+  "primary-coordinator",
+  "bundled:primary-coordinator",
+);
+
 export const bundledSkills = [
   loadBundledSkill("coworker-memory", "bundled:coworker-memory"),
   loadBundledSkill("coworker-administration", "bundled:coworker-administration"),
@@ -264,6 +274,8 @@ export const bundledSkills = [
   bundledTelegramMessagingSkill,
   bundledDiscordMessagingSkill,
   bundledBrowserControlSkill,
+  bundledCoworkerMessagingSkill,
+  bundledPrimaryCoordinatorSkill,
 ] as const;
 
 function unquote(value: string): string {

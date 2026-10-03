@@ -12,6 +12,7 @@ import {
   TelegramLinkBadge,
   telegramConnectionCount,
 } from "../components/Primitives";
+import { sortCoworkers } from "../lib/coworker-filter";
 
 const countWords = [
   "zero",
@@ -52,8 +53,9 @@ export function HomePage({
   const latestActor = latestActivity?.coworkerId
     ? snapshot.coworkers.find((coworker) => coworker.id === latestActivity.coworkerId)?.name
     : null;
-  const availableCoworkers = snapshot.coworkers.filter(
-    (coworker) => coworker.status === "active",
+  // The primary coworker is the default point of contact, so it leads.
+  const availableCoworkers = sortCoworkers(
+    snapshot.coworkers.filter((coworker) => coworker.status === "active"),
   );
   const [draft, setDraft] = useState("");
   const [assigneeId, setAssigneeId] = useState<string | null>(
@@ -186,6 +188,7 @@ export function HomePage({
                     type="button"
                   >
                     {coworker.name}
+                    {coworker.isPrimary ? <small> · primary</small> : null}
                   </button>
                 ))}
                 <button

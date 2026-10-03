@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import type {
   AppSettings,
   Coworker,
@@ -10,6 +10,15 @@ import { Icon } from "../components/Icon";
 import { ModalPortal } from "../components/ModalPortal";
 import { ModelSelector } from "../components/ModelSelector";
 import { ProviderSelect } from "../components/ProviderSelect";
+import { TagInput } from "../components/TagInput";
+import { AvatarPhotoControl } from "../components/AvatarPhotoControl";
+import {
+  CoworkerMoreButton,
+  menuPositionFor,
+  useCoworkerActions,
+} from "../components/CoworkerActions";
+import { splitPinnedCoworkers } from "../lib/pinned-coworkers";
+import { allCoworkerTags, filterCoworkers, sortCoworkers } from "../lib/coworker-filter";
 import {
   CoworkerAvatar,
   CoworkerModelBadge,
@@ -43,6 +52,26 @@ export function CoworkersPage({
   onOpenModelSettings?: () => void;
 }) {
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+  const actions = useCoworkerActions({ coworkers, onChanged });
+  const tags = useMemo(() => allCoworkerTags(coworkers), [coworkers]);
+  // Primary first, then pinned coworkers, then everyone else.
+  const visible = useMemo(() => {
+    const { pinned, others } = splitPinnedCoworkers(sortCoworkers(coworkers), actions.pinnedIds);
+    return filterCoworkers([...pinned, ...others], query);
+  }, [coworkers, query, actions.pinnedIds]);
+  const activeTags = new Set(
+    query.toLocaleLowerCase().split(/\s+/).filter((term) => term.startsWith("#")).map((term) => term.slice(1)),
+  );
+
+  function toggleTagFilter(tag: string) {
+    const terms = query.split(/\s+/).filter(Boolean);
+    const token = `#${tag}`;
+    const has = terms.some((term) => term.toLocaleLowerCase() === token);
+    setQuery(
+      (has ? terms.filter((term) => term.toLocaleLowerCase() !== token) : [...terms, token]).join(" "),
+    );
+  }
   const [view, setView] = useState<CoworkerView>(() =>
     window.localStorage.getItem("coworker-directory-view") === "list" ? "list" : "cards",
   );
@@ -91,24 +120,78 @@ export function CoworkersPage({
 
       <div className="coworker-directory-head">
         <span>
-          {coworkers.length} coworker{coworkers.length === 1 ? "" : "s"}
+          {query.trim()
+            ? `${visible.length} of ${coworkers.length} coworkers`
+            : `${coworkers.length} coworker${coworkers.length === 1 ? "" : "s"}`}
         </span>
+        <label className="coworker-search">
+          <Icon name="search" />
+          <input
+            aria-label="Search coworkers"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by name, role, or #tag"
+            type="search"
+            value={query}
+          />
+        </label>
         <small>
           {view === "cards" ? "Workspace cards" : "Compact directory"}
         </small>
       </div>
 
+      {tags.length > 0 ? (
+        <div className="coworker-tag-filter" role="group" aria-label="Filter by tag">
+          {tags.map((tag) => (
+            <button
+              aria-pressed={activeTags.has(tag)}
+              className="tag-chip"
+              key={tag}
+              onClick={() => toggleTagFilter(tag)}
+              type="button"
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className={`coworker-roster ${view}`}>
-        {coworkers.map((coworker) => (
-          <button className="roster-card" key={coworker.id} onClick={() => onOpen(coworker)}>
+        {coworkers.length > 0 && visible.length === 0 ? (
+          <div className="coworker-directory-empty">
+            <h3>No coworkers match “{query.trim()}”</h3>
+            <button className="text-button" onClick={() => setQuery("")} type="button">
+              Clear search
+            </button>
+          </div>
+        ) : null}
+        {visible.map((coworker) => (
+          <div className="roster-card-wrap" key={coworker.id}>
+          <button
+            className="roster-card"
+            onClick={() => onOpen(coworker)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              actions.openMenu(coworker, menuPositionFor(event));
+            }}
+          >
             <CoworkerAvatar className="large-avatar" coworker={coworker} />
             <span className="roster-copy">
               <span className="roster-name">
                 <strong>{coworker.name}</strong>
+                {coworker.isPrimary ? <span className="primary-badge">Primary</span> : null}
                 <StatusLabel status={coworker.runtimeStatus} />
               </span>
               <h3>{coworker.role}</h3>
               <p>{coworker.description || "Ready to take on a focused responsibility."}</p>
+              {coworker.tags.length > 0 ? (
+                <span className="roster-tags">
+                  {coworker.tags.map((tag) => (
+                    <span className="tag-chip" key={tag}>
+                      #{tag}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </span>
             <span className="roster-meta">
               <span>
@@ -128,6 +211,12 @@ export function CoworkersPage({
               <Icon name="arrow" />
             </span>
           </button>
+          <CoworkerMoreButton
+            className="roster-card-more"
+            coworker={coworker}
+            onOpen={(position) => actions.openMenu(coworker, position)}
+          />
+          </div>
         ))}
         {coworkers.length === 0 ? (
           <div className="coworker-directory-empty">
@@ -142,6 +231,8 @@ export function CoworkersPage({
           </div>
         ) : null}
       </div>
+
+      {actions.element}
 
       {creating ? (
         <CreateCoworkerModal
@@ -178,6 +269,8 @@ export function CreateCoworkerModal({
     settings.defaultModelProvider ?? "",
   );
   const [modelName, setModelName] = useState(settings.defaultModelName ?? "");
+  const [tags, setTags] = useState<string[]>([]);
+  const [photo, setPhoto] = useState<string | null>(null);
   const [avatarChoice, setAvatarChoice] = useState(() =>
     Math.floor(Math.random() * coworkerAvatarCount),
   );
@@ -198,6 +291,8 @@ export function CreateCoworkerModal({
         name,
         role,
         avatarIndex: avatarChoice,
+        ...(photo ? { avatarImage: photo } : {}),
+        tags,
         description: String(data.get("description") ?? "").trim(),
         systemPrompt: `You are ${name}, a ${role}. Work carefully, use only the tools provided, and never claim an external action succeeded unless its tool confirms success.`,
         modelProvider: provider,
@@ -260,6 +355,7 @@ export function CreateCoworkerModal({
                 );
               })}
             </div>
+            <AvatarPhotoControl disabled={saving} onChange={setPhoto} photo={photo} />
           </div>
           <label>
             <span>Name</span>
@@ -277,6 +373,10 @@ export function CreateCoworkerModal({
               rows={3}
               maxLength={1000}
             />
+          </label>
+          <label>
+            <span>Tags</span>
+            <TagInput disabled={saving} onChange={setTags} tags={tags} />
           </label>
           {provider ? (
             <>

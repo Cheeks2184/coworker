@@ -22,6 +22,31 @@ export const toolCatalog = [
     defaultPolicy: "automatic",
   },
   {
+    name: "coworkers.list",
+    label: "List coworkers",
+    description:
+      "List the other coworkers on the team: id, name, role, description, tags, status, and whether one is the primary coworker. Use it to decide who to ask before sending a message.",
+    risk: "low",
+    defaultPolicy: "automatic",
+  },
+  {
+    name: "coworkers.send_message",
+    label: "Message a coworker",
+    description:
+      "Send a message to another coworker by id or exact name. It is delivered to their queue and they work on it independently. With expectReply (default true) their answer comes back to you as a follow-up and is also shown to the user.",
+    risk: "low",
+    defaultPolicy: "automatic",
+    idempotency: "call",
+  },
+  {
+    name: "coworkers.activity",
+    label: "Review coworker activity",
+    description:
+      "Summarize what other coworkers have been doing recently: status, tasks by outcome, and recent task titles with short results. Read-only.",
+    risk: "low",
+    defaultPolicy: "automatic",
+  },
+  {
     name: "web.search",
     label: "Search the web",
     description:
