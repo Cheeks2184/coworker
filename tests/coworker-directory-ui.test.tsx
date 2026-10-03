@@ -153,10 +153,11 @@ describe("sidebar working indicator", () => {
     );
   }
 
-  it("shows a working dot and what the coworker is working on", () => {
+  it("shows a working dot and a plain working label", () => {
     renderItem("WORKING", "RUNNING");
     expect(screen.getByRole("status", { name: "Bea is working" })).toBeTruthy();
-    expect(screen.getByText("Working on Draft the memo")).toBeTruthy();
+    expect(screen.getByText("Working")).toBeTruthy();
+    expect(screen.queryByText(/Draft the memo/)).toBeNull();
   });
 
   it("flags a coworker waiting for approval", () => {
@@ -183,6 +184,13 @@ describe("sidebar working indicator", () => {
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText("Primary")).toBeNull();
     expect(screen.getByText("Draft the memo")).toBeTruthy();
+  });
+
+  it("shows the role in a chip next to the name", () => {
+    renderItem("IDLE", "COMPLETED");
+    const chip = screen.getByText("Bea specialist");
+    expect(chip.className).toBe("roster-role-chip");
+    expect(chip.getAttribute("title")).toBe("Bea specialist");
   });
 });
 

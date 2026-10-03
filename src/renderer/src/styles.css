@@ -3441,7 +3441,14 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   min-height: 52px;
-  padding: 8px 12px 7px 15px;
+  padding: 8px 12px 7px 10px;
+}
+
+.conversation-roster-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .conversation-roster-head h1 {
@@ -3538,13 +3545,11 @@ select:focus {
   border-radius: 11px;
   transition:
     background 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease;
+    border-color 140ms ease;
 }
 
 .conversation-roster-item:hover {
   background: color-mix(in srgb, var(--white) 55%, transparent);
-  transform: translateX(1px);
 }
 
 .conversation-roster-item.selected {
@@ -3582,6 +3587,11 @@ select:focus {
   height: 32px;
   color: var(--on-accent);
   background: var(--forest);
+}
+
+.conversation-roster-item .conversation-avatar {
+  width: 40px;
+  height: 40px;
 }
 
 .conversation-roster-copy,
@@ -3638,15 +3648,22 @@ select:focus {
   border-radius: 99px;
 }
 
-/* .conversation-roster-copy > span forces centered row alignment; restore the
-   stacked, left-aligned badge inside roster items. */
+/* .conversation-roster-copy > span forces centered row alignment; keep the badge
+   left-aligned. Roster rows show only the model name on one line, using the row's
+   width before truncating; the tooltip carries the provider and full model id. */
 .conversation-roster-copy > .coworker-model-badge {
   max-width: 100%;
-  flex-direction: column;
   align-items: flex-start;
   align-self: flex-start;
   justify-content: flex-start;
-  gap: 2px;
+}
+
+.conversation-roster-copy > .coworker-model-badge > code {
+  max-width: 100%;
+}
+
+.conversation-roster-copy > .coworker-model-badge > code + span {
+  display: none;
 }
 
 .conversation-roster-empty {
@@ -3701,31 +3718,7 @@ select:focus {
 }
 
 .conversation-roster-footer .appearance-picker {
-  padding: 6px 6px 0;
-}
-
-.conversation-workroom-link {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 52px;
-  padding: 0 15px;
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 620;
-  text-align: left;
-  background: color-mix(in srgb, var(--white) 30%, transparent);
-  border: 0;
-}
-
-.conversation-workroom-link:hover {
-  color: var(--accent-text);
-  background: color-mix(in srgb, var(--white) 68%, transparent);
-}
-
-.conversation-workroom-link svg {
-  width: 14px;
-  height: 14px;
+  padding: 6px;
 }
 
 .conversation-main {
@@ -8917,6 +8910,23 @@ button.tag-chip[aria-pressed="true"] {
   border-radius: 5px;
 }
 
+/* Shrinks well before the name does, so a long role truncates first. */
+.roster-role-chip {
+  flex: 0 10 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--ink-faint) 12%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
 .roster-section-label {
   display: flex;
   align-items: center;
@@ -9148,15 +9158,21 @@ button.tag-chip[aria-pressed="true"] {
   height: 14px;
 }
 
+/* The ⋯ button overlays the time instead of replacing it, so hovering a row
+   never changes its size or reflows the name line. */
 .roster-item-end {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
 }
 
 .roster-item-end .coworker-more-button {
+  position: absolute;
+  top: 50%;
+  right: -4px;
   display: none;
+  transform: translateY(-50%);
 }
 
 .conversation-roster-item:hover .roster-item-end .coworker-more-button,
@@ -9166,7 +9182,7 @@ button.tag-chip[aria-pressed="true"] {
 
 .conversation-roster-item:hover .roster-item-end time,
 .conversation-roster-item:focus-within .roster-item-end time {
-  display: none;
+  visibility: hidden;
 }
 
 .hero-more,

@@ -9,6 +9,7 @@ export type IconName =
   | "settings"
   | "plus"
   | "arrow"
+  | "back"
   | "send"
   | "stop"
   | "open"
@@ -79,6 +80,7 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="m9 18 6-6-6-6" />,
+  back: <path d="m15 18-6-6 6-6" />,
   send: <path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />,
   stop: <rect x="7" y="7" width="10" height="10" rx="1" />,
   open: (

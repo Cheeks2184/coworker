@@ -1056,7 +1056,18 @@ function GroupConversationSurface({
       <aside className="conversation-roster-panel">
         <ConversationRosterResizeHandle onReset={resetRoster} onResize={resizeRoster} />
         <header className="conversation-roster-head">
-          <h1>Channels</h1>
+          <span className="conversation-roster-title">
+            <button
+              aria-label="Back to workspace"
+              className="conversation-icon-button"
+              onClick={onBack}
+              title="Back to workspace"
+              type="button"
+            >
+              <Icon name="back" />
+            </button>
+            <h1>Channels</h1>
+          </span>
           {/* Channel creation is hidden until group channels are ready. */}
         </header>
         <nav className="conversation-roster" aria-label="Channels and coworkers">
@@ -1101,10 +1112,6 @@ function GroupConversationSurface({
         </nav>
         <div className="conversation-roster-footer">
           <AppearancePicker />
-          <button className="conversation-workroom-link" onClick={onBack}>
-            <Icon name="home" />
-            <span>Back to workspace</span>
-          </button>
         </div>
       </aside>
 
@@ -1725,6 +1732,11 @@ export function CoworkerRosterItem({
         <span>
           <span className="roster-name-line">
             <strong>{coworker.name}</strong>
+            {coworker.role ? (
+              <span className="roster-role-chip" title={coworker.role}>
+                {coworker.role}
+              </span>
+            ) : null}
             {coworker.isPrimary ? (
               <span className="roster-primary-badge" title="Primary coworker: your main point of contact">
                 Primary
@@ -1744,17 +1756,13 @@ export function CoworkerRosterItem({
                 <span />
                 <span />
               </span>
-              <span className="roster-working-text">
-                {latestTask?.status === "RUNNING" && latestTask.title
-                  ? `Working on ${latestTask.title}`
-                  : "Working…"}
-              </span>
+              <span className="roster-working-text">Working</span>
             </small>
           ) : needsApproval ? (
             <small className="roster-waiting">Waiting for your approval</small>
           ) : (
             <small>
-              {latestTask?.title || coworker.description || `${coworker.role} is ready to help.`}
+              {latestTask?.title || coworker.description || "Ready to help."}
             </small>
           )}
           {waiting > 0 ? <b>{waiting}</b> : null}
@@ -2697,7 +2705,18 @@ function CoworkerSurface({
       <aside className="conversation-roster-panel">
         <ConversationRosterResizeHandle onReset={resetRoster} onResize={resizeRoster} />
         <header className="conversation-roster-head">
-          <h1>Coworkers</h1>
+          <span className="conversation-roster-title">
+            <button
+              aria-label="Back to workspace"
+              className="conversation-icon-button"
+              onClick={onBack}
+              title="Back to workspace"
+              type="button"
+            >
+              <Icon name="back" />
+            </button>
+            <h1>Coworkers</h1>
+          </span>
           <span className="conversation-roster-actions">
             {/* Channel creation is hidden until group channels are ready. */}
             <button
@@ -2832,10 +2851,6 @@ function CoworkerSurface({
         {coworkerActions.element}
         <div className="conversation-roster-footer">
           <AppearancePicker />
-          <button className="conversation-workroom-link" onClick={onBack}>
-            <Icon name="home" />
-            <span>Back to workspace</span>
-          </button>
         </div>
       </aside>
 
