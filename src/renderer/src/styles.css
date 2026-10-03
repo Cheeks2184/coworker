@@ -800,17 +800,46 @@ svg {
   padding: 44px max(32px, calc((100% - 700px) / 2)) 72px;
 }
 
-.team-room-main .page-header {
-  margin-bottom: 14px;
+/* A calm, centered greeting that sits right above the composer. */
+.team-greeting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 24px;
+  text-align: center;
 }
 
-.team-room-main .page-header h1 {
-  font-size: clamp(28px, 2.7vw, 40px);
+.team-greeting h1 {
+  position: relative;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+/* Hangs left of the words so they stay centered over the line below. */
+.team-greeting-art {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.3em;
+  transform: translateY(-50%);
+}
+
+.team-greeting p {
+  color: var(--ink-soft);
+  font-size: 15px;
 }
 
 .team-pills {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-bottom: 22px;
 }
@@ -1438,6 +1467,28 @@ svg {
   flex-direction: column;
   gap: 22px;
   padding: 44px 18px 32px;
+}
+
+.team-clock time {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.team-clock strong {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.team-clock span {
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
 .team-crew {

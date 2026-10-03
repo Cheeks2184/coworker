@@ -19,6 +19,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 const baseline = new Date(2026, 9, 3, 15, 0);
@@ -210,7 +211,12 @@ describe("team room", () => {
 
   it("shows each coworker's work as a feed, live work first", () => {
     setup();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/^Good \w+\. Your team is on it\.$/);
+    const greeting = screen.getByRole("heading", { level: 1 });
+    expect(greeting.textContent).toMatch(/^Good (morning|afternoon|evening)!$/);
+    // The art matches the greeting's time of day.
+    const period = greeting.textContent!.match(/^Good (\w+)!$/)![1];
+    expect(greeting.querySelector(`svg[data-period="${period}"]`)?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText("Here’s what our team is busy with…")).toBeTruthy();
     const status = screen.getByLabelText("Team status").textContent;
     expect(status).toContain("1 running now");
     expect(status).toContain("1 decision waiting on you");
@@ -313,6 +319,20 @@ describe("team room", () => {
     // A new filter starts again from the first page.
     fireEvent.click(screen.getByRole("tab", { name: "Sarah" }));
     expect(screen.getAllByRole("article")).toHaveLength(12);
+  });
+
+  it("shows the current date and time at the top of the rail, turning over each minute", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 3, 17, 33, 20));
+    setup();
+    const clock = screen.getByRole("region", { name: "Current time" });
+    expect(clock.textContent).toMatch(/^5:33\sPM/);
+    expect(clock.textContent).toContain("2026");
+
+    act(() => {
+      vi.advanceTimersByTime(40_000);
+    });
+    expect(clock.textContent).toMatch(/^5:34\sPM/);
   });
 
   it("summarizes the team, approvals and recent files in the rail", () => {

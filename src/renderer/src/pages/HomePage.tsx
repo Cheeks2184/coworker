@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -14,7 +15,7 @@ import { formatClockTime } from "@shared/time";
 import { artifactExtension } from "../components/ArtifactActions";
 import { ChatMarkdown } from "../components/ChatMarkdown";
 import { Icon } from "../components/Icon";
-import { CoworkerAvatar, EmptyState, PageHeader } from "../components/Primitives";
+import { CoworkerAvatar, EmptyState } from "../components/Primitives";
 import { approvalPreviewRows } from "../lib/approval-preview";
 import { sortCoworkers } from "../lib/coworker-filter";
 import {
@@ -112,21 +113,13 @@ export function HomePage({
   return (
     <div className="page team-room">
       <div className="team-room-main">
-        <PageHeader eyebrow="Team room" title={`${greeting(now)} Your team is on it.`} />
-        <div aria-label="Team status" className="team-pills">
-          <span className="team-pill">
-            <i className="team-dot running" />
-            <strong>{stats.working}</strong> running now
-          </span>
-          <span className="team-pill">
-            <i className="team-dot waiting" />
-            <strong>{stats.waiting}</strong> {stats.waiting === 1 ? "decision" : "decisions"} waiting on you
-          </span>
-          <span className="team-pill">
-            <i className="team-dot done" />
-            <strong>{stats.doneToday}</strong> {stats.doneToday === 1 ? "task" : "tasks"} done today
-          </span>
-        </div>
+        <header className="team-greeting">
+          <h1>
+            <TimeOfDayArt period={dayPeriod(now)} />
+            Good {dayPeriod(now)}!
+          </h1>
+          <p>Here’s what our team is busy with…</p>
+        </header>
 
         {snapshot.coworkers.length === 0 ? (
           <EmptyState
@@ -148,6 +141,21 @@ export function HomePage({
                 onOpenCoworker={onOpenCoworker}
               />
             ) : null}
+
+            <div aria-label="Team status" className="team-pills">
+              <span className="team-pill">
+                <i className="team-dot running" />
+                <strong>{stats.working}</strong> running now
+              </span>
+              <span className="team-pill">
+                <i className="team-dot waiting" />
+                <strong>{stats.waiting}</strong> {stats.waiting === 1 ? "decision" : "decisions"} waiting on you
+              </span>
+              <span className="team-pill">
+                <i className="team-dot done" />
+                <strong>{stats.doneToday}</strong> {stats.doneToday === 1 ? "task" : "tasks"} done today
+              </span>
+            </div>
 
             <div aria-label="Filter activity" className="team-filters" role="tablist">
               <FilterTab selected={filter === "all"} onSelect={() => selectFilter("all")}>
@@ -208,6 +216,7 @@ export function HomePage({
 
       <aside aria-label="Team overview" className="team-room-rail">
         <div className="team-room-rail-inner">
+          <RailClock />
           {coworkers.length > 0 ? <CrewCard coworkers={coworkers} onOpen={onChatWithTeam} /> : null}
           <ApprovalsPanel
             approvals={snapshot.approvals}
@@ -544,6 +553,39 @@ function scrollParent(element: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/** The current date and time, refreshed at the start of each minute. */
+function RailClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleNextMinute = () => {
+      timer = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextMinute();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    scheduleNextMinute();
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <section aria-label="Current time" className="team-clock">
+      <time dateTime={now.toISOString()}>
+        <strong>{formatClockTime(now)}</strong>
+        <span>
+          {now.toLocaleDateString(undefined, {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
+        </span>
+      </time>
+    </section>
+  );
+}
+
 function CrewCard({ coworkers, onOpen }: { coworkers: Coworker[]; onOpen: () => void }) {
   const shown = coworkers.slice(0, 4);
   const more = coworkers.length - shown.length;
@@ -760,16 +802,86 @@ function emptyFeedText(filter: string, coworkers: Coworker[]): string {
   return "Quiet so far. Give a coworker a task above and their work shows up here.";
 }
 
+type DayPeriod = "morning" | "afternoon" | "evening";
+
+/** Late night counts as evening, so it gets the moon rather than a sunrise. */
+function dayPeriod(now: Date): DayPeriod {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 18) return "afternoon";
+  return "evening";
+}
+
+/** A small illustration of the time of day beside the greeting. */
+function TimeOfDayArt({ period }: { period: DayPeriod }) {
+  const id = useId().replaceAll(":", "");
+  const common = { "aria-hidden": true, className: "team-greeting-art", viewBox: "0 0 48 48" } as const;
+  if (period === "morning") {
+    return (
+      <svg {...common} data-period="morning">
+        <defs>
+          <linearGradient id={`${id}-sun`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#ffd47a" />
+            <stop offset="1" stopColor="#f59a4c" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M24 11v5M9.86 16.86l3.54 3.54M38.14 16.86l-3.54 3.54"
+          fill="none"
+          stroke="#f5a65b"
+          strokeLinecap="round"
+          strokeWidth="2.6"
+        />
+        <path d="M13 31a11 11 0 0 1 22 0Z" fill={`url(#${id}-sun)`} />
+        <path d="M5 31h38" stroke="#e58a46" strokeLinecap="round" strokeWidth="2.6" />
+        <path d="M12 37h24" opacity="0.55" stroke="#e58a46" strokeLinecap="round" strokeWidth="2.6" />
+      </svg>
+    );
+  }
+  if (period === "afternoon") {
+    return (
+      <svg {...common} data-period="afternoon">
+        <defs>
+          <radialGradient cx="0.4" cy="0.35" id={`${id}-sun`} r="0.75">
+            <stop offset="0" stopColor="#ffe68a" />
+            <stop offset="1" stopColor="#f6b23d" />
+          </radialGradient>
+        </defs>
+        <path
+          d="M24 5v5M24 38v5M5 24h5M38 24h5M10.57 10.57l3.53 3.53M37.43 10.57l-3.53 3.53M10.57 37.43l3.53-3.53M37.43 37.43l-3.53-3.53"
+          fill="none"
+          stroke="#f6b23d"
+          strokeLinecap="round"
+          strokeWidth="2.6"
+        />
+        <circle cx="24" cy="24" fill={`url(#${id}-sun)`} r="10" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common} data-period="evening">
+      <defs>
+        <linearGradient id={`${id}-moon`} x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stopColor="#dfe6ff" />
+          <stop offset="1" stopColor="#9aa8f2" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M20.55 10.07A15 15 0 1 0 35.93 30.57A13 13 0 0 1 20.55 10.07Z"
+        fill={`url(#${id}-moon)`}
+      />
+      <path
+        d="M37 6.5l1.3 3.2 3.2 1.3-3.2 1.3L37 15.5l-1.3-3.2-3.2-1.3 3.2-1.3Z"
+        fill="#f7d98b"
+      />
+      <circle cx="42" cy="22" fill="#f7d98b" r="1.4" />
+    </svg>
+  );
+}
+
 function composerTaskTitle(text: string): string {
   const firstLine = text.split("\n")[0]?.trim() || "New task";
   return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
-}
-
-function greeting(now: Date): string {
-  const hour = now.getHours();
-  if (hour < 12) return "Good morning.";
-  if (hour < 18) return "Good afternoon.";
-  return "Good evening.";
 }
 
 function compactAge(timestamp: string): string {
