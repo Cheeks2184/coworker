@@ -99,7 +99,7 @@ describe("credentials encrypted under a previous app identity", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Models" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "Model Providers" })).toBeTruthy(),
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });

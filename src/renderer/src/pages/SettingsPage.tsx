@@ -41,7 +41,7 @@ export type SettingsTab =
 
 const settingsTabLabels: Record<SettingsTab, string> = {
   general: "General",
-  models: "Models",
+  models: "Model Providers",
   "web-search": "Web search",
   skills: "Skills",
   integrations: "Channels",
@@ -614,7 +614,7 @@ export function SettingsPage({
                         onClick={() => setTab(location.tab)}
                         type="button"
                       >
-                        Open {location.tabLabel}
+                        Open {settingsTabLabels[location.tab]}
                       </button>
                     </li>
                   );
@@ -643,9 +643,7 @@ export function SettingsPage({
           ) : null}
           {tab === "general" ? (
             <section className="settings-section">
-              <span className="eyebrow">Desktop behavior</span>
-              <h2>Keep the room available</h2>
-              <p>Schedules can run only while the app or its tray process remains active.</p>
+              <h2>General Settings</h2>
               <div className="settings-rows">
                 <label className="settings-row">
                   <span>
@@ -743,7 +741,7 @@ export function SettingsPage({
 
           {tab === "models" ? (
             <section className="settings-section">
-              <h2>LLM Providers</h2>
+              <h2>Model Providers</h2>
               <div className="provider-grid model-provider-grid">
                 {knownProviderCards.map((provider) => (
                   <button
@@ -1321,22 +1319,10 @@ export function SettingsPage({
   );
 }
 
-function credentialLocation(key: string): {
-  label: string;
-  tab: SettingsTab;
-  tabLabel: string;
-} {
+function credentialLocation(key: string): { label: string; tab: SettingsTab } {
   const webSearch = webSearchProviders.find((provider) => key === `web-search:${provider}`);
-  if (webSearch) {
-    return {
-      label: `${providerLabel(webSearch)} web search key`,
-      tab: "web-search",
-      tabLabel: "Web search",
-    };
-  }
-  if (key === "integration:email:resend") {
-    return { label: "Resend email key", tab: "integrations", tabLabel: "Channels" };
-  }
+  if (webSearch) return { label: `${providerLabel(webSearch)} web search key`, tab: "web-search" };
+  if (key === "integration:email:resend") return { label: "Resend email key", tab: "integrations" };
   const model = remoteModelProviderDefinitions.find(
     (provider) =>
       key === modelProviderCredentialKey(provider.id) ||
@@ -1348,10 +1334,9 @@ function credentialLocation(key: string): {
         ? `${model.label} base URL`
         : `${model.label} API key`,
       tab: "models",
-      tabLabel: "Models",
     };
   }
-  return { label: key, tab: "models", tabLabel: "Models" };
+  return { label: key, tab: "models" };
 }
 
 function providerLabel(provider: WebSearchProvider): string {

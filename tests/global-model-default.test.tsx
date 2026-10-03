@@ -98,7 +98,7 @@ describe("global model default", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Models" }));
+    fireEvent.click(screen.getByRole("button", { name: "Model Providers" }));
     // With no global default yet the switch starts on so the first verified
     // provider becomes the default in the same save.
     const defaultSwitch = screen.getByRole("checkbox");
@@ -158,7 +158,7 @@ describe("global model default", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Models" }));
+    fireEvent.click(screen.getByRole("button", { name: "Model Providers" }));
     const openRouter = await screen.findByRole("button", {
       name: "OpenRouter Connected · Default",
     });
@@ -233,7 +233,7 @@ describe("global model default", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Models" }));
+    fireEvent.click(screen.getByRole("button", { name: "Model Providers" }));
     // OpenRouter leads the provider cards and starts selected.
     const providerCards = screen.getAllByRole("button", { name: /Not connected$/ });
     expect(providerCards[0]?.textContent).toContain("OpenRouter");
