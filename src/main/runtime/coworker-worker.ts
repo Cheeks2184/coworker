@@ -6,11 +6,14 @@ import { Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-age
 import {
   InMemoryCredentialStore,
   Type,
+  createInitialSystemMessage,
   createModels,
   fauxAssistantMessage,
   fauxProvider,
   fauxToolCall,
+  toToolDeclaration,
   type Context,
+  type JsonObject,
   type MutableModels,
 } from "@earendil-works/pi-ai";
 import { getToolCatalogEntry } from "@shared/tool-catalog";
@@ -72,7 +75,7 @@ interface RecordedTurn {
    * pass it resumed; re-running a completed task starts a new one. */
   run: number;
   text: string;
-  toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+  toolCalls: Array<{ id: string; name: string; arguments: JsonObject }>;
   stopReason: string;
 }
 
@@ -120,7 +123,8 @@ function checkpointActiveRun(): void {
 }
 
 function durableCheckpointMessages(messages: AgentMessage[]): AgentMessage[] {
-  return messages.map((message) => {
+  // Each run rebuilds the system message, so checkpoints keep only the conversation.
+  return messages.filter((message) => message.role !== "system").map((message) => {
     if (message.role !== "toolResult" || !Array.isArray(message.content)) return message;
     return {
       ...message,
@@ -665,7 +669,7 @@ function parseInvoicePrompt(input: string): {
   return { client, email, hours, rate, dueDays };
 }
 
-function parseDemoSchedule(input: string): Record<string, unknown> {
+function parseDemoSchedule(input: string): JsonObject {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const timeMatch = input.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   let hour = Number(timeMatch?.[1] ?? 9);
@@ -755,7 +759,7 @@ function recordAssistantTurn(message: { content: unknown; stopReason?: unknown }
           type: "toolCall";
           id: string;
           name: string;
-          arguments: Record<string, unknown>;
+          arguments: JsonObject;
         } => block?.type === "toolCall",
       )
       .map((block) => ({
@@ -1079,16 +1083,18 @@ async function runTask(message: Extract<MainToWorkerMessage, { type: "run" }>): 
     approval: null,
   };
   try {
-    agent.state.systemPrompt = [
-      baseSystemPrompt,
-      formatWorkspaceContext(message.workspaceContext ?? []),
-      formatRequestContext(message.requestContext),
-    ].filter(Boolean).join("\n\n");
-    if (message.checkpoint?.length) {
-      agent.state.messages = restoreMessages(message.checkpoint);
-    } else {
-      agent.state.messages = [];
-    }
+    // The prompt and tool list live in the transcript's leading system message,
+    // so replacing the messages must put a fresh one first.
+    const systemMessage = createInitialSystemMessage(
+      [
+        baseSystemPrompt,
+        formatWorkspaceContext(message.workspaceContext ?? []),
+        formatRequestContext(message.requestContext),
+      ].filter(Boolean).join("\n\n"),
+      agent.state.tools.map(toToolDeclaration),
+    );
+    const history = message.checkpoint?.length ? restoreMessages(message.checkpoint) : [];
+    agent.state.messages = systemMessage ? [systemMessage, ...history] : history;
     if (message.taskId !== recordedTaskId) {
       recordedTaskId = message.taskId;
       recordedTurns = [];
