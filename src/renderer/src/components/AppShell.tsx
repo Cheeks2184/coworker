@@ -58,6 +58,14 @@ export function AppShell({
                 ) : null}
               </button>
             ))}
+            <button
+              className={activePage === "settings" ? "nav-item active" : "nav-item"}
+              onClick={() => onNavigate("settings")}
+              aria-current={activePage === "settings" ? "page" : undefined}
+            >
+              <Icon name="settings" />
+              <span>Settings</span>
+            </button>
           </nav>
 
           <div className="sidebar-spacer" />
@@ -67,13 +75,6 @@ export function AppShell({
             </span>
           ) : null}
           <AppearancePicker />
-          <button
-            className={activePage === "settings" ? "nav-item active" : "nav-item"}
-            onClick={() => onNavigate("settings")}
-          >
-            <Icon name="settings" />
-            <span>Settings</span>
-          </button>
         </aside>
       ) : null}
       <main className="main-stage">{children}</main>
