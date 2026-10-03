@@ -4142,6 +4142,33 @@ select:focus {
   padding: 6px;
 }
 
+/* Lines its icon up with the appearance trigger above it. */
+.roster-settings-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  margin: 0 6px 6px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 620;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.roster-settings-link:hover {
+  color: var(--accent-text);
+  background: var(--forest-soft);
+}
+
+.roster-settings-link svg {
+  width: 18px;
+  height: 18px;
+}
+
 .conversation-main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

@@ -458,6 +458,39 @@ describe("Coworkers navigation", () => {
     expect(mainNavigation()).toBeNull();
   });
 
+  it("opens global settings from a coworker's chat", async () => {
+    const snapshot: AppSnapshot = {
+      coworkers: [coworker("ava", "Ava")], conversations: [], discussions: [], tasks: [], messages: [],
+      imageAttachments: [], approvals: [], schedules: [], artifacts: [], activity: [],
+      integrations: [], modelEndpoints: [], skills: [], settings,
+      dataPath: "/tmp/coworker-data", version: "0.6.1",
+    };
+    // Every call the chat makes resolves empty unless listed here.
+    const overrides: Record<string, unknown> = {
+      platform: "darwin",
+      "app.bootstrap": async () => snapshot,
+      "events.subscribe": () => () => undefined,
+      "integrations.credentialStatus": async () => ({ configured: false }),
+      "diagnostics.listProviderErrors": async () => [],
+    };
+    const api = (path: string): unknown =>
+      new Proxy(function () {}, {
+        get: (_target, prop) => {
+          if (typeof prop === "symbol" || prop === "then") return undefined;
+          const key = path ? `${path}.${prop}` : prop;
+          return key in overrides ? overrides[key] : api(key);
+        },
+        apply: () => Promise.resolve([]),
+      });
+    Object.defineProperty(window, "coworker", { configurable: true, value: api("") });
+
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /Chat with team/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
+    expect(mainNavigation()).toBeTruthy();
+  });
+
   it("opens the directory from Home when the team is empty", async () => {
     const { listConversation } = mockWorkroom([]);
     const { default: App } = await import("@renderer/App");

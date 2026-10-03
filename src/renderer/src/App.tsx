@@ -164,6 +164,7 @@ export default function App() {
           modelEndpoints={snapshot.modelEndpoints}
           initialConversationId={focusConversationId}
           onBack={() => navigate("home")}
+          onOpenSettings={() => navigate("settings")}
           onChanged={refresh}
           onOpenApprovals={() => navigate("approvals")}
           onOpenModelSettings={openModelSettings}

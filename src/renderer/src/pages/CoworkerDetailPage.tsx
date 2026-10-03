@@ -472,6 +472,7 @@ export function CoworkerDetailPage({
   modelEndpoints = [],
   initialConversationId = null,
   onBack,
+  onOpenSettings,
   onChanged,
   onOpenApprovals,
   onOpenModelSettings,
@@ -493,6 +494,7 @@ export function CoworkerDetailPage({
   modelEndpoints?: ModelEndpoint[];
   initialConversationId?: string | null;
   onBack: () => void;
+  onOpenSettings: () => void;
   onChanged: () => Promise<void>;
   onOpenApprovals: () => void;
   onOpenModelSettings?: () => void;
@@ -692,6 +694,7 @@ export function CoworkerDetailPage({
           messages={conversationMessages}
           modelEndpoints={modelEndpoints}
           onBack={onBack}
+          onOpenSettings={onOpenSettings}
           onChanged={onChanged}
           onCreateGroup={() => setCreatingGroup(true)}
           onEditGroup={() => setEditingGroup(displayConversation)}
@@ -723,6 +726,7 @@ export function CoworkerDetailPage({
             showReasoning={settings.showReasoning}
             modelEndpoints={modelEndpoints}
             onBack={onBack}
+            onOpenSettings={onOpenSettings}
             onChanged={onChanged}
             onCreate={() => setCreating(true)}
             onCreateGroup={() => setCreatingGroup(true)}
@@ -811,6 +815,7 @@ function GroupConversationSurface({
   imageAttachments,
   modelEndpoints = [],
   onBack,
+  onOpenSettings,
   onChanged,
   onCreateGroup,
   onEditGroup,
@@ -828,6 +833,7 @@ function GroupConversationSurface({
   imageAttachments: TaskImageAttachmentSummary[];
   modelEndpoints?: ModelEndpoint[];
   onBack: () => void;
+  onOpenSettings: () => void;
   onChanged: () => Promise<void>;
   onCreateGroup: () => void;
   onEditGroup: () => void;
@@ -1113,6 +1119,10 @@ function GroupConversationSurface({
         </nav>
         <div className="conversation-roster-footer">
           <AppearancePicker />
+          <button className="roster-settings-link" onClick={onOpenSettings} type="button">
+            <Icon name="settings" />
+            <span>Settings</span>
+          </button>
         </div>
       </aside>
 
@@ -1791,6 +1801,7 @@ function CoworkerSurface({
   showReasoning,
   modelEndpoints = [],
   onBack,
+  onOpenSettings,
   onChanged,
   onCreate,
   onCreateGroup,
@@ -1816,6 +1827,7 @@ function CoworkerSurface({
   showReasoning: boolean;
   modelEndpoints?: ModelEndpoint[];
   onBack: () => void;
+  onOpenSettings: () => void;
   onChanged: () => Promise<void>;
   onCreate: () => void;
   onCreateGroup: () => void;
@@ -2852,6 +2864,10 @@ function CoworkerSurface({
         {coworkerActions.element}
         <div className="conversation-roster-footer">
           <AppearancePicker />
+          <button className="roster-settings-link" onClick={onOpenSettings} type="button">
+            <Icon name="settings" />
+            <span>Settings</span>
+          </button>
         </div>
       </aside>
 
