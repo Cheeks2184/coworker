@@ -24,7 +24,9 @@ Coworker is a local-first desktop app for independent AI coworkers. There is **n
 - **Runs on your computer** — macOS, Windows, and Linux. Conversations, files, and app data are stored locally.
 - **Local models** — point it at [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai) and inference never leaves your machine.
 - **Bring your own keys** — Anthropic, OpenAI, Google, OpenRouter, or any OpenAI-compatible endpoint. Credentials stay in OS-backed storage.
+- **A team** — mark one coworker as primary to coordinate the others and post a daily team digest. Coworkers can hand work to each other, and Home shows what everyone is doing.
 - **Skills** — coworkers learn new capabilities from Agent Skills. Upload a `SKILL.md`, add an HTTPS URL, or paste a skill link into chat.
+- **Web search** — works right after install on Firecrawl's free tier. Add a Firecrawl, Tavily, Exa, or SerpAPI key for higher limits.
 - **Memory** — coworkers can propose useful facts and preferences to remember across conversations. Approve, edit, or reject each proposal in chat, Telegram, or Discord; manage saved Markdown in the desktop app or CLI.
 - **Scheduler** — persistent cron and one-time jobs, in plain language, with crash recovery.
 - **Approvals** — consequential actions pause until you approve or reject them, in the app or from Telegram or Discord.
@@ -54,7 +56,7 @@ Unpackaged development builds use a separate **Coworker Development** data profi
 
 The app ships with two demo coworkers — **Ava** (accounting) and **Sarah** (sales) — that run on a built-in faux provider, so you can try the full flow without an API key.
 
-To connect a real model, open **Settings → Providers**, add credentials, and verify the provider. Ollama (`http://127.0.0.1:11434/v1`) and LM Studio (`http://127.0.0.1:1234/v1`) work without an API key.
+To connect a real model, open **Settings → Model Providers**, add credentials, and verify the provider. Ollama (`http://127.0.0.1:11434/v1`) and LM Studio (`http://127.0.0.1:1234/v1`) work without an API key.
 
 Scripts, tests, evals, and packaging: [Development](docs/development.md)
 
