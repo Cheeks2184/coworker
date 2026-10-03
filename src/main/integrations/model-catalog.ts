@@ -138,6 +138,11 @@ function errorMessage(body: unknown): string | null {
   return null;
 }
 
+function requestFailureDetail(error: unknown): string {
+  if (error instanceof Error && error.name === "TimeoutError") return "the request timed out";
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function requestJson(
   provider: RemoteModelProvider,
   url: URL,
@@ -155,13 +160,7 @@ async function requestJson(
       signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
-    const detail =
-      error instanceof Error && error.name === "TimeoutError"
-        ? "the request timed out"
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    throw new Error(`Could not query ${label} models: ${detail}`);
+    throw new Error(`Could not query ${label} models: ${requestFailureDetail(error)}`);
   }
 
   let body: unknown;
@@ -334,6 +333,33 @@ async function queryOpenRouterModels(
   });
 }
 
+/**
+ * OpenRouter's model list is public and answers any bearer token, so it cannot
+ * tell a mistyped key from a real one. The key endpoint authenticates it.
+ */
+async function verifyOpenRouterKey(apiKey: string, fetcher: ModelCatalogFetch): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetcher(new URL("https://openrouter.ai/api/v1/key"), {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      method: "GET",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    throw new Error(`Could not verify the OpenRouter API key: ${requestFailureDetail(error)}`);
+  }
+  if (response.ok) return;
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(
+      'OpenRouter did not accept this API key. Copy the full key from openrouter.ai/settings/keys; it starts with "sk-or-".',
+    );
+  }
+  const detail = errorMessage(await response.json().catch(() => null));
+  throw new Error(
+    `Could not verify the OpenRouter API key (${response.status})${detail ? `: ${detail}` : ""}`,
+  );
+}
+
 function price(value: string | number | undefined): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
@@ -432,6 +458,15 @@ function sortModels(models: readonly ModelOption[]): ModelOption[] {
       sensitivity: "base",
     }),
   );
+}
+
+/** Rejects a key that listing models alone would accept. */
+export async function verifyModelCredential(
+  provider: RemoteModelProvider,
+  apiKey: string,
+  fetcher: ModelCatalogFetch = fetch,
+): Promise<void> {
+  if (provider === "openrouter") await verifyOpenRouterKey(apiKey, fetcher);
 }
 
 export async function queryProviderModels(

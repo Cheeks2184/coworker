@@ -6,6 +6,7 @@ import {
   listAvailableModels,
   modelSupportsImageInput,
   queryProviderModels,
+  verifyModelCredential,
   type ModelCatalogFetch,
 } from "@main/integrations/model-catalog";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
@@ -158,6 +159,33 @@ describe("provider model catalog", () => {
         },
       },
     ]);
+  });
+
+  it("verifies OpenRouter keys against the authenticated key endpoint", async () => {
+    const fetcher = vi.fn<ModelCatalogFetch>(async (input, init) => {
+      expect(String(input)).toBe("https://openrouter.ai/api/v1/key");
+      return new Headers(init?.headers).get("authorization") === "Bearer sk-or-v1-good"
+        ? jsonResponse({ data: { label: "sk-or-v1-goo...ood" } })
+        : jsonResponse({ error: { message: "Missing Authentication header", code: 401 } }, 401);
+    });
+
+    await expect(verifyModelCredential("openrouter", "sk-or-v1-good", fetcher)).resolves.toBeUndefined();
+    await expect(verifyModelCredential("openrouter", "sk-not-openrouter", fetcher)).rejects.toThrow(
+      'OpenRouter did not accept this API key. Copy the full key from openrouter.ai/settings/keys; it starts with "sk-or-".',
+    );
+    // Other providers' model lists already reject a wrong key.
+    await expect(verifyModelCredential("openai", "test-openai-key", fetcher)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an OpenRouter key-check outage without blaming the key", async () => {
+    const fetcher = vi.fn<ModelCatalogFetch>(async () =>
+      jsonResponse({ error: { message: "Upstream unavailable" } }, 503),
+    );
+
+    await expect(verifyModelCredential("openrouter", "sk-or-v1-good", fetcher)).rejects.toThrow(
+      "Could not verify the OpenRouter API key (503): Upstream unavailable",
+    );
   });
 
   it("discovers Ollama models and reads native vision capabilities", async () => {

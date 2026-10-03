@@ -39,6 +39,7 @@ import {
   localModelCredentialMarker,
   listAvailableModels,
   queryProviderModels,
+  verifyModelCredential,
 } from "@main/integrations/model-catalog";
 import {
   getModelProviderDefinition,
@@ -1838,7 +1839,7 @@ export class DesktopAppService {
       }
       const submittedBaseUrl = input.baseUrl?.trim();
       const storedBaseUrl =
-        definition.baseUrlMode === "none" || submittedBaseUrl
+        definition.baseUrlMode === "none"
           ? undefined
           : (await readableCredential(
               this.options.credentials,
@@ -1848,6 +1849,7 @@ export class DesktopAppService {
       if (definition.baseUrlMode === "required" && !baseUrl) {
         throw new Error(`A base URL is required for ${modelProviderName(input.provider)}`);
       }
+      await verifyModelCredential(input.provider, apiKey, fetch);
       const availableModels = await queryProviderModels(input.provider, apiKey, fetch, { baseUrl });
       if (availableModels.length === 0) {
         throw new Error(
@@ -1865,6 +1867,9 @@ export class DesktopAppService {
       await this.options.credentials.set(key, apiKey);
       if (definition.baseUrlMode !== "none" && baseUrl) {
         await this.options.credentials.set(modelProviderBaseUrlKey(input.provider), baseUrl);
+      }
+      if (submittedApiKey || (definition.baseUrlMode !== "none" && baseUrl !== storedBaseUrl)) {
+        await this.restartCoworkersUsing(input.provider);
       }
       if (isModelEndpointProvider(input.provider)) {
         this.database.upsertModelEndpoint({
@@ -1892,6 +1897,17 @@ export class DesktopAppService {
         error,
       );
       throw error;
+    }
+  }
+
+  /** Workers keep the credentials they started with, so restart the ones on this provider. */
+  private async restartCoworkersUsing(provider: RemoteModelProvider): Promise<void> {
+    const affected = this.database
+      .listCoworkers()
+      .filter((coworker) => coworker.modelProvider === provider);
+    await Promise.all(affected.map((coworker) => this.runtime.stop(coworker.id)));
+    for (const coworker of affected) {
+      if (coworker.status === "active") this.runtime.enqueueTask(coworker.id);
     }
   }
 
