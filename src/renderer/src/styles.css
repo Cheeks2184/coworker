@@ -884,9 +884,14 @@ svg {
   background: var(--blue);
 }
 
+.team-dot.failed {
+  background: var(--red);
+}
+
 .team-chip-avatar,
 .team-card-avatar,
 .team-stack-avatar,
+.team-filter-avatar,
 .team-file-owner {
   display: inline-grid;
   flex: 0 0 auto;
@@ -1010,34 +1015,156 @@ svg {
 .team-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 22px;
 }
 
-.team-filter {
+.team-range {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
+  gap: 2px;
+  padding: 3px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.team-range > svg {
+  width: 14px;
+  height: 14px;
+  margin: 0 5px 0 7px;
+  color: var(--ink-faint);
+}
+
+.team-range button,
+.team-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
   padding: 0 11px;
   color: var(--ink-soft);
   font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 7px;
 }
 
-.team-filter:hover {
+.team-range button:hover {
+  color: var(--ink);
+  background: var(--cloud);
+}
+
+.team-filter-menus {
+  display: flex;
+  gap: 8px;
+}
+
+.team-filter-menu {
+  position: relative;
+}
+
+/* As tall as the range control, so the whole bar lines up. */
+.team-filter-button {
+  min-height: 36px;
+  padding: 0 10px 0 9px;
   color: var(--ink);
   background: var(--white);
+  border-color: var(--line);
+  border-radius: 10px;
 }
 
-/* Ink on paper, like the approve buttons, so the active filter is unmistakable. */
-.team-filter.selected {
+.team-filter-button:hover {
+  border-color: var(--line-strong);
+}
+
+/* Ink on paper, like the approve buttons, so an applied filter is unmistakable. */
+.team-range button[aria-pressed="true"],
+.team-filter-button.filtering {
   color: var(--white);
   background: var(--ink);
   border-color: var(--ink);
+}
+
+.team-filter-mark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.team-filter-mark > svg {
+  width: 15px;
+  height: 15px;
+}
+
+.team-filter-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.team-filter-chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+  transform: rotate(90deg);
+}
+
+.team-filter-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  max-height: 320px;
+  padding: 5px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 15px 34px color-mix(in srgb, var(--shadow-color) 14%, transparent);
+  scrollbar-width: thin;
+}
+
+.team-filter-options > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 0 10px 0 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+}
+
+.team-filter-options > button:hover,
+.team-filter-options > button:focus-visible {
+  background: var(--cloud);
+  outline: 0;
+}
+
+.team-filter-options > button[aria-selected="true"] {
+  font-weight: 680;
+}
+
+.team-filter-check {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
 }
 
 .team-feed-more {
@@ -1094,6 +1221,10 @@ svg {
 
 .team-feed-empty {
   padding: 18px 2px;
+}
+
+.team-feed-empty .team-link {
+  margin-left: 8px;
 }
 
 .team-card {

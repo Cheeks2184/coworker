@@ -1,7 +1,18 @@
 import type { AppSnapshot, Approval, Artifact, Conversation, Coworker, Task } from "@shared/contracts";
 
 export type TeamFeedState = "running" | "queued" | "needs-you" | "done" | "failed";
-export type TeamFeedSection = "now" | "today" | "earlier";
+export type TeamFeedSection = "now" | "today" | "yesterday" | "earlier";
+export type TeamFeedRange = "any" | "today" | "yesterday" | "week";
+export type TeamFeedStatus = "any" | "needs-you" | "in-progress" | "done" | "failed";
+
+export interface TeamFeedFilters {
+  range: TeamFeedRange;
+  status: TeamFeedStatus;
+  /** Null shows everyone. */
+  coworkerId: string | null;
+}
+
+export const allActivity: TeamFeedFilters = { range: "any", status: "any", coworkerId: null };
 
 export interface TeamFeedItem {
   id: string;
@@ -19,7 +30,7 @@ export interface TeamFeedItem {
   at: string;
 }
 
-const sectionOrder: Record<TeamFeedSection, number> = { now: 0, today: 1, earlier: 2 };
+const sectionOrder: Record<TeamFeedSection, number> = { now: 0, today: 1, yesterday: 2, earlier: 3 };
 
 export function buildTeamFeed(snapshot: AppSnapshot, now = new Date()): TeamFeedItem[] {
   const coworkers = new Map(snapshot.coworkers.map((coworker) => [coworker.id, coworker]));
@@ -51,7 +62,7 @@ export function buildTeamFeed(snapshot: AppSnapshot, now = new Date()): TeamFeed
         task,
         coworker,
         state,
-        section: finished ? (isSameDay(new Date(at), now) ? "today" : "earlier") : "now",
+        section: finished ? daySection(new Date(at), now) : "now",
         approval,
         requester: requesterOf(task, conversations, coworkers),
         body:
@@ -65,6 +76,44 @@ export function buildTeamFeed(snapshot: AppSnapshot, now = new Date()): TeamFeed
   return items.sort(
     (left, right) => sectionOrder[left.section] - sectionOrder[right.section] || right.at.localeCompare(left.at),
   );
+}
+
+export function matchesFilters(item: TeamFeedItem, filters: TeamFeedFilters, now = new Date()): boolean {
+  return (
+    inRange(item, filters.range, now) &&
+    hasStatus(item, filters.status) &&
+    (filters.coworkerId === null || item.coworker.id === filters.coworkerId)
+  );
+}
+
+/** Live work is happening now, so it counts as today and never as yesterday. */
+function inRange(item: TeamFeedItem, range: TeamFeedRange, now: Date): boolean {
+  switch (range) {
+    case "any":
+      return true;
+    case "today":
+      return item.section === "now" || item.section === "today";
+    case "yesterday":
+      return item.section === "yesterday";
+    case "week":
+      return (
+        item.section !== "earlier" ||
+        new Date(item.at) >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+      );
+  }
+}
+
+function hasStatus(item: TeamFeedItem, status: TeamFeedStatus): boolean {
+  if (status === "any") return true;
+  if (status === "in-progress") return item.state === "running" || item.state === "queued";
+  return item.state === status;
+}
+
+function daySection(date: Date, now: Date): TeamFeedSection {
+  if (isSameDay(date, now)) return "today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  return isSameDay(date, yesterday) ? "yesterday" : "earlier";
 }
 
 function feedState(task: Task, approval: Approval | null): TeamFeedState {

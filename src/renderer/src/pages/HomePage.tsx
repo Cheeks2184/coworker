@@ -19,20 +19,49 @@ import { CoworkerAvatar, EmptyState } from "../components/Primitives";
 import { approvalPreviewRows } from "../lib/approval-preview";
 import { sortCoworkers } from "../lib/coworker-filter";
 import {
+  allActivity,
   approvalHighlights,
   buildTeamFeed,
   isSameDay,
+  matchesFilters,
   recentArtifacts,
   teamStats,
+  type TeamFeedFilters,
   type TeamFeedItem,
+  type TeamFeedRange,
   type TeamFeedSection,
   type TeamFeedState,
+  type TeamFeedStatus,
 } from "../lib/team-feed";
 
 const sectionLabels: Record<TeamFeedSection, string> = {
   now: "Now",
   today: "Earlier today",
+  yesterday: "Yesterday",
   earlier: "Earlier",
+};
+
+const rangeLabels: Record<TeamFeedRange, string> = {
+  any: "Any time",
+  today: "Today",
+  yesterday: "Yesterday",
+  week: "Last 7 days",
+};
+
+const statusLabels: Record<TeamFeedStatus, string> = {
+  any: "Any status",
+  "needs-you": "Needs you",
+  "in-progress": "In progress",
+  done: "Done",
+  failed: "Failed",
+};
+
+/** Matches the status pills: green for live work, amber for decisions, blue for done. */
+const statusDots: Record<Exclude<TeamFeedStatus, "any">, string> = {
+  "needs-you": "waiting",
+  "in-progress": "running",
+  done: "done",
+  failed: "failed",
 };
 
 const stateChips: Partial<Record<TeamFeedState, string>> = {
@@ -69,19 +98,14 @@ export function HomePage({
   const feed = useMemo(() => buildTeamFeed(snapshot), [snapshot]);
   const coworkers = sortCoworkers(snapshot.coworkers);
   const availableCoworkers = coworkers.filter((coworker) => coworker.status === "active");
-  // "all", "needs-you", or a coworker id.
-  const [filter, setFilter] = useState("all");
+  const [filters, setFilters] = useState<TeamFeedFilters>(allActivity);
   const [visibleCount, setVisibleCount] = useState(feedPageSize);
   const [deciding, setDeciding] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
-  const filtered = feed.filter((item) =>
-    filter === "all"
-      ? true
-      : filter === "needs-you"
-        ? item.state === "needs-you"
-        : item.coworker.id === filter,
-  );
+  const filtered = feed.filter((item) => matchesFilters(item, filters, now));
   const visible = filtered.slice(0, visibleCount);
+  const filtering = filters.range !== "any" || filters.status !== "any" || filters.coworkerId !== null;
+  const needsYou = feed.filter((item) => item.state === "needs-you").length;
   const replyableThreads = new Set(
     snapshot.conversations
       .filter((conversation) => !conversation.archivedAt)
@@ -89,8 +113,8 @@ export function HomePage({
   );
   const loadMore = useCallback(() => setVisibleCount((count) => count + feedPageSize), []);
 
-  function selectFilter(next: string) {
-    setFilter(next);
+  function changeFilters(next: Partial<TeamFeedFilters>) {
+    setFilters((current) => ({ ...current, ...next }));
     setVisibleCount(feedPageSize);
   }
 
@@ -157,23 +181,46 @@ export function HomePage({
               </span>
             </div>
 
-            <div aria-label="Filter activity" className="team-filters" role="tablist">
-              <FilterTab selected={filter === "all"} onSelect={() => selectFilter("all")}>
-                All activity
-              </FilterTab>
-              <FilterTab selected={filter === "needs-you"} onSelect={() => selectFilter("needs-you")}>
-                Needs you
-                {stats.waiting > 0 ? <span className="team-count">{stats.waiting}</span> : null}
-              </FilterTab>
-              {coworkers.map((coworker) => (
-                <FilterTab
-                  key={coworker.id}
-                  selected={filter === coworker.id}
-                  onSelect={() => selectFilter(coworker.id)}
-                >
-                  {coworker.name}
-                </FilterTab>
-              ))}
+            <div aria-label="Filter activity" className="team-filters" role="group">
+              <div aria-label="When" className="team-range" role="group">
+                <Icon name="clock" />
+                {(Object.keys(rangeLabels) as TeamFeedRange[]).map((range) => (
+                  <button
+                    aria-pressed={filters.range === range}
+                    key={range}
+                    onClick={() => changeFilters({ range })}
+                    type="button"
+                  >
+                    {rangeLabels[range]}
+                  </button>
+                ))}
+              </div>
+              <div className="team-filter-menus">
+                <FilterMenu
+                  label="Status"
+                  onChange={(status) => changeFilters({ status })}
+                  options={(Object.keys(statusLabels) as TeamFeedStatus[]).map((status) => ({
+                    value: status,
+                    label: statusLabels[status],
+                    mark: status === "any" ? <Icon name="activity" /> : <i className={`team-dot ${statusDots[status]}`} />,
+                    count: status === "needs-you" ? needsYou : 0,
+                  }))}
+                  value={filters.status}
+                />
+                <FilterMenu
+                  label="Coworker"
+                  onChange={(coworkerId) => changeFilters({ coworkerId: coworkerId || null })}
+                  options={[
+                    { value: "", label: "Everyone", mark: <Icon name="people" /> },
+                    ...coworkers.map((coworker) => ({
+                      value: coworker.id,
+                      label: coworker.name,
+                      mark: <CoworkerAvatar className="team-filter-avatar" coworker={coworker} />,
+                    })),
+                  ]}
+                  value={filters.coworkerId ?? ""}
+                />
+              </div>
             </div>
 
             {decisionError ? (
@@ -183,9 +230,16 @@ export function HomePage({
             ) : null}
 
             {visible.length === 0 ? (
-              <p className="team-feed-empty">{emptyFeedText(filter, coworkers)}</p>
+              <p className="team-feed-empty">
+                {emptyFeedText(filters, coworkers)}
+                {filtering ? (
+                  <button className="team-link" onClick={() => changeFilters(allActivity)} type="button">
+                    Clear filters
+                  </button>
+                ) : null}
+              </p>
             ) : (
-              (["now", "today", "earlier"] as const).map((section) => {
+              (Object.keys(sectionLabels) as TeamFeedSection[]).map((section) => {
                 const items = visible.filter((item) => item.section === section);
                 return items.length === 0 ? null : (
                   <section aria-label={sectionLabels[section]} className="team-feed-section" key={section}>
@@ -336,25 +390,88 @@ function TaskComposer({
   );
 }
 
-function FilterTab({
-  selected,
-  onSelect,
-  children,
+interface FilterOption<T extends string> {
+  value: T;
+  label: string;
+  /** An icon, dot, or avatar shown before the label. */
+  mark: ReactNode;
+  count?: number;
+}
+
+/** A button showing the current choice that opens a menu of the others; the first option filters nothing. */
+function FilterMenu<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
 }: {
-  selected: boolean;
-  onSelect: () => void;
-  children: ReactNode;
+  label: string;
+  options: Array<FilterOption<T>>;
+  value: T;
+  onChange: (value: T) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const selected = options.find((option) => option.value === value) ?? options[0]!;
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   return (
-    <button
-      aria-selected={selected}
-      className={selected ? "team-filter selected" : "team-filter"}
-      onClick={onSelect}
-      role="tab"
-      type="button"
-    >
-      {children}
-    </button>
+    <div className="team-filter-menu" ref={root}>
+      <button
+        aria-controls={open ? listboxId : undefined}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`${label}: ${selected.label}`}
+        className={selected === options[0] ? "team-filter-button" : "team-filter-button filtering"}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span aria-hidden="true" className="team-filter-mark">
+          {selected.mark}
+        </span>
+        {selected.label}
+        <Icon className="team-filter-chevron" name="arrow" />
+      </button>
+      {open ? (
+        <div aria-label={label} className="team-filter-options" id={listboxId} role="listbox">
+          {options.map((option) => (
+            <button
+              aria-selected={option.value === value}
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              role="option"
+              type="button"
+            >
+              <span aria-hidden="true" className="team-filter-mark">
+                {option.mark}
+              </span>
+              {option.label}
+              {option.count ? <span className="team-count">{option.count}</span> : null}
+              {option.value === value ? <Icon className="team-filter-check" name="check" /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -795,11 +912,15 @@ function lowerFirst(text: string): string {
   return /^[A-Z][a-z]/.test(text) ? `${text.charAt(0).toLowerCase()}${text.slice(1)}` : text;
 }
 
-function emptyFeedText(filter: string, coworkers: Coworker[]): string {
-  if (filter === "needs-you") return "Nothing needs you right now.";
-  const coworker = coworkers.find((candidate) => candidate.id === filter);
-  if (coworker) return `${coworker.name} hasn’t picked up any work yet.`;
-  return "Quiet so far. Give a coworker a task above and their work shows up here.";
+function emptyFeedText({ range, status, coworkerId }: TeamFeedFilters, coworkers: Coworker[]): string {
+  const coworker = coworkers.find((candidate) => candidate.id === coworkerId);
+  if (range === "any" && status === "any") {
+    return coworker
+      ? `${coworker.name} hasn’t picked up any work yet.`
+      : "Quiet so far. Give a coworker a task above and their work shows up here.";
+  }
+  if (status === "needs-you" && !coworker && range !== "yesterday") return "Nothing needs you right now.";
+  return "Nothing matches these filters.";
 }
 
 type DayPeriod = "morning" | "afternoon" | "evening";

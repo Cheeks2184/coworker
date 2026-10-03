@@ -12,7 +12,14 @@ import type {
   Message,
   Task,
 } from "@shared/contracts";
-import { approvalHighlights, buildTeamFeed, teamStats } from "@renderer/lib/team-feed";
+import {
+  allActivity,
+  approvalHighlights,
+  buildTeamFeed,
+  matchesFilters,
+  teamStats,
+  type TeamFeedFilters,
+} from "@renderer/lib/team-feed";
 import { HomePage } from "@renderer/pages/HomePage";
 
 afterEach(() => {
@@ -90,6 +97,7 @@ describe("team feed", () => {
         task("done", "sarah", { result: "All set.", completedAt: at(14) }),
         task("failed", "sarah", { status: "FAILED", error: "Model unavailable", completedAt: at(40) }),
         task("yesterday", "sarah", { completedAt: new Date(2026, 9, 2, 18, 0).toISOString() }),
+        task("older", "sarah", { completedAt: new Date(2026, 8, 30, 18, 0).toISOString() }),
         task("cancelled", "sarah", { status: "CANCELLED" }),
         // Relays another coworker's reply, which already has its own card.
         task("relay", "ava", { replyFromCoworkerId: "sarah" }),
@@ -108,7 +116,8 @@ describe("team feed", () => {
       ["waiting", "needs-you", "now"],
       ["done", "done", "today"],
       ["failed", "failed", "today"],
-      ["yesterday", "done", "earlier"],
+      ["yesterday", "done", "yesterday"],
+      ["older", "done", "earlier"],
     ]);
     expect(feed.map((item) => item.body)).toEqual([
       "Pulled **230 transactions**.",
@@ -116,8 +125,39 @@ describe("team feed", () => {
       "All set.",
       "Model unavailable",
       null,
+      null,
     ]);
     expect(feed[1]?.approval?.id).toBe("a1");
+  });
+
+  it("filters by time, status and coworker together", () => {
+    const snapshot = snapshotWith({
+      coworkers: [ava, sarah],
+      tasks: [
+        task("running", "ava", { status: "RUNNING", startedAt: at(2), completedAt: null }),
+        task("waiting", "ava", { status: "WAITING_FOR_APPROVAL", completedAt: null }),
+        task("today", "sarah", { completedAt: at(14) }),
+        task("yesterday", "sarah", { status: "FAILED", completedAt: new Date(2026, 9, 2, 18, 0).toISOString() }),
+        // The first of the last 7 days, and one day before it.
+        task("six-days-ago", "sarah", { completedAt: new Date(2026, 8, 27, 0, 30).toISOString() }),
+        task("seven-days-ago", "sarah", { completedAt: new Date(2026, 8, 26, 23, 30).toISOString() }),
+      ],
+      approvals: [approval("a1", "waiting")],
+    });
+    const feed = buildTeamFeed(snapshot, baseline);
+    const ids = (filters: Partial<TeamFeedFilters>) =>
+      feed.filter((item) => matchesFilters(item, { ...allActivity, ...filters }, baseline)).map((item) => item.id);
+
+    expect(ids({})).toEqual(["running", "waiting", "today", "yesterday", "six-days-ago", "seven-days-ago"]);
+    // Live work is happening now, so it belongs to today.
+    expect(ids({ range: "today" })).toEqual(["running", "waiting", "today"]);
+    expect(ids({ range: "yesterday" })).toEqual(["yesterday"]);
+    expect(ids({ range: "week" })).toEqual(["running", "waiting", "today", "yesterday", "six-days-ago"]);
+    expect(ids({ status: "in-progress" })).toEqual(["running"]);
+    expect(ids({ status: "needs-you" })).toEqual(["waiting"]);
+    expect(ids({ status: "failed" })).toEqual(["yesterday"]);
+    expect(ids({ status: "done", range: "week", coworkerId: "sarah" })).toEqual(["today", "six-days-ago"]);
+    expect(ids({ coworkerId: "ava", range: "yesterday" })).toEqual([]);
   });
 
   it("names who asked for delegated work", () => {
@@ -178,6 +218,9 @@ describe("team room", () => {
         artifacts: { open },
       },
     });
+    const yesterdayNoon = new Date();
+    yesterdayNoon.setDate(yesterdayNoon.getDate() - 1);
+    yesterdayNoon.setHours(12, 0, 0, 0);
     const snapshot = snapshotWith({
       coworkers: [
         coworker("ava", "Ava", { role: "Accounting Coworker", runtimeStatus: "WORKING", isPrimary: true }),
@@ -192,6 +235,7 @@ describe("team room", () => {
         task("pipeline", "sarah", {
           title: "Pull the Q3 pipeline", result: "Both renewals are in the contract stage.", completedAt: minutesAgo(14),
         }),
+        task("recap", "ava", { title: "Send the weekly recap", completedAt: yesterdayNoon.toISOString() }),
       ],
       approvals: [approval("a1", "waiting", { createdAt: minutesAgo(6) })],
       messages: [message("m1", "running", "Pulled **230 transactions** from Mercury.", minutesAgo(1))],
@@ -242,15 +286,63 @@ describe("team room", () => {
     await vi.waitFor(() => expect(decide).toHaveBeenCalledWith({ approvalId: "a1", decision: "reject" }));
   });
 
-  it("filters to what needs you or to one coworker", () => {
+  it("narrows the feed to today or yesterday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 3, 15, 0));
     setup();
-    fireEvent.click(screen.getByRole("tab", { name: /Needs you/ }));
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    const range = screen.getByRole("group", { name: "When" });
+    expect(within(range).getByRole("button", { name: "Any time" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getByRole("region", { name: "Yesterday" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Sarah" }));
+    fireEvent.click(within(range).getByRole("button", { name: "Yesterday" }));
+    const [recap] = screen.getAllByRole("article");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(recap!.textContent).toContain("finished Send the weekly recap");
+
+    // Live work counts as today.
+    fireEvent.click(within(range).getByRole("button", { name: "Today" }));
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.queryByRole("region", { name: "Yesterday" })).toBeNull();
+    expect(within(range).getByRole("button", { name: "Today" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("filters by status and coworker from their menus, and clears them", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 3, 15, 0));
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Status: Any status" }));
+    const needsYou = within(screen.getByRole("listbox", { name: "Status" })).getByRole("option", { name: /Needs you/ });
+    expect(needsYou.textContent).toContain("1");
+    fireEvent.click(needsYou);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    const [waiting] = screen.getAllByRole("article");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(waiting!.textContent).toContain("wants to send 4 invoice reminders");
+
+    // Filters combine, and nothing from Sarah needs you.
+    fireEvent.click(screen.getByRole("button", { name: "Coworker: Everyone" }));
+    fireEvent.click(screen.getByRole("option", { name: "Sarah" }));
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(screen.getByText("Nothing matches these filters.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Status: Needs you" }));
+    fireEvent.click(screen.getByRole("option", { name: "Any status" }));
     const [card] = screen.getAllByRole("article");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(card!.textContent).toContain("finished Pull the Q3 pipeline");
     expect(card!.textContent).toContain("Both renewals are in the contract stage.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Coworker: Sarah" }));
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    const range = screen.getByRole("group", { name: "When" });
+    fireEvent.click(within(range).getByRole("button", { name: "Yesterday" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Coworker: Everyone" })).toBeTruthy();
+    expect(within(range).getByRole("button", { name: "Any time" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("replies to a coworker without leaving the team room", async () => {
@@ -317,7 +409,7 @@ describe("team room", () => {
     expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
 
     // A new filter starts again from the first page.
-    fireEvent.click(screen.getByRole("tab", { name: "Sarah" }));
+    fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
     expect(screen.getAllByRole("article")).toHaveLength(12);
   });
 
