@@ -7,7 +7,7 @@ import { TagInput } from "@renderer/components/TagInput";
 import { insertMention, mentionQuery, mentionSuggestions, withReplyTag } from "@renderer/lib/coworker-filter";
 import { CoworkersPage } from "@renderer/pages/CoworkersPage";
 import { CoworkerRosterItem } from "@renderer/pages/CoworkerDetailPage";
-import type { AppSettings, Coworker, Task } from "@shared/contracts";
+import type { AppSettings, AppSnapshot, Coworker, Task } from "@shared/contracts";
 
 afterEach(() => {
   cleanup();
@@ -215,6 +215,29 @@ describe("pinned coworkers", () => {
     expect(readPinnedCoworkerIds()).toEqual(["ava"]);
     window.localStorage.removeItem("pinned-coworkers");
   });
+
+  it("defaults to the coworker opened last, otherwise the top of the roster", async () => {
+    const { defaultCoworkerId, rememberOpenedCoworker } = await import("@renderer/lib/pinned-coworkers");
+    window.localStorage.removeItem("last-opened-coworker");
+    window.localStorage.removeItem("pinned-coworkers");
+    const team = [
+      { id: "ava", isPrimary: false },
+      { id: "bea", isPrimary: false },
+      { id: "cy", isPrimary: false },
+    ];
+    expect(defaultCoworkerId([])).toBeNull();
+    expect(defaultCoworkerId(team)).toBe("ava");
+    window.localStorage.setItem("pinned-coworkers", JSON.stringify(["cy"]));
+    expect(defaultCoworkerId(team)).toBe("cy");
+    expect(defaultCoworkerId(team.map((c) => ({ ...c, isPrimary: c.id === "bea" })))).toBe("bea");
+    rememberOpenedCoworker("ava");
+    expect(defaultCoworkerId(team)).toBe("ava");
+    // A coworker removed since it was last opened falls back to the roster.
+    rememberOpenedCoworker("gone");
+    expect(defaultCoworkerId(team)).toBe("cy");
+    window.localStorage.removeItem("last-opened-coworker");
+    window.localStorage.removeItem("pinned-coworkers");
+  });
 });
 
 describe("primary change confirmation", () => {
@@ -345,5 +368,74 @@ describe("coworker actions on the Coworkers page", () => {
     fireEvent.contextMenu(document.querySelector(".roster-card")!, { clientX: 5, clientY: 5 });
     expect(screen.getByRole("menuitem", { name: "Remove as primary" })).toBeTruthy();
     expect((screen.getByRole("menuitem", { name: "Pinned as primary" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("Coworkers navigation", () => {
+  const settings: AppSettings = {
+    demoMode: false, launchAtLogin: false, runInBackground: true, theme: "forest", colorMode: "light",
+    showReasoning: true, globalOperatingInstructions: "", defaultModelProvider: null, defaultModelName: null,
+  };
+
+  function mockWorkroom(coworkers: Coworker[]) {
+    // History that never arrives keeps the chat on its loading state.
+    const listConversation = vi.fn((_conversationId: string) => new Promise<never>(() => undefined));
+    const snapshot: AppSnapshot = {
+      coworkers, conversations: [], discussions: [], tasks: [], messages: [],
+      imageAttachments: [], approvals: [], schedules: [], artifacts: [], activity: [],
+      integrations: [], modelEndpoints: [], skills: [], settings,
+      dataPath: "/tmp/coworker-data", version: "0.6.1",
+    };
+    Object.defineProperty(window, "coworker", {
+      configurable: true,
+      value: {
+        platform: "darwin",
+        app: { bootstrap: async () => snapshot },
+        events: { subscribe: () => () => undefined },
+        messages: { listConversation },
+      },
+    });
+    return { listConversation };
+  }
+
+  async function renderApp() {
+    const { default: App } = await import("@renderer/App");
+    const { AppDataProvider } = await import("@renderer/state/AppDataProvider");
+    render(<AppDataProvider><App /></AppDataProvider>);
+    await screen.findByRole("heading", { name: "Your coworkers" });
+  }
+
+  const mainNavigation = () => screen.queryByRole("navigation", { name: "Main navigation" });
+
+  it("opens a chat from the sidebar: the primary at first, then whoever was opened last", async () => {
+    window.localStorage.removeItem("last-opened-coworker");
+    const { listConversation } = mockWorkroom([coworker("ava", "Ava"), coworker("bea", "Bea", [], true)]);
+
+    await renderApp();
+    fireEvent.click(within(mainNavigation()!).getByRole("button", { name: "Coworkers" }));
+    await vi.waitFor(() => expect(listConversation).toHaveBeenCalledWith("coworker:bea"));
+    expect(mainNavigation()).toBeNull();
+    cleanup();
+
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /Ava specialist/ }));
+    await vi.waitFor(() => expect(listConversation).toHaveBeenLastCalledWith("coworker:ava"));
+    cleanup();
+    listConversation.mockClear();
+
+    await renderApp();
+    fireEvent.click(within(mainNavigation()!).getByRole("button", { name: "Coworkers" }));
+    await vi.waitFor(() => expect(listConversation).toHaveBeenCalledWith("coworker:ava"));
+    expect(listConversation).not.toHaveBeenCalledWith("coworker:bea");
+    window.localStorage.removeItem("last-opened-coworker");
+  });
+
+  it("keeps the directory behind Manage all on Home", async () => {
+    const { listConversation } = mockWorkroom([coworker("ava", "Ava")]);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /Manage all/ }));
+    expect(screen.getByRole("searchbox", { name: "Search coworkers" })).toBeTruthy();
+    expect(mainNavigation()).toBeTruthy();
+    expect(listConversation).not.toHaveBeenCalled();
   });
 });

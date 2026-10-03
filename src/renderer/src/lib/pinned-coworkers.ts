@@ -93,3 +93,28 @@ export function usePinnedLayout() {
   }, []);
   return { layout, toggleLayout };
 }
+
+const lastOpenedKey = "last-opened-coworker";
+
+export function rememberOpenedCoworker(id: string): void {
+  try {
+    window.localStorage.setItem(lastOpenedKey, id);
+  } catch {
+    // Not remembered when storage is unavailable.
+  }
+}
+
+/** The coworker opened last, otherwise whoever tops the roster: the primary, then pins. */
+export function defaultCoworkerId(
+  coworkers: Array<Pick<Coworker, "id" | "isPrimary">>,
+): string | null {
+  let lastOpened: string | null = null;
+  try {
+    lastOpened = window.localStorage.getItem(lastOpenedKey);
+  } catch {
+    // Unreadable storage counts as nothing remembered.
+  }
+  if (coworkers.some((coworker) => coworker.id === lastOpened)) return lastOpened;
+  const { pinned, others } = splitPinnedCoworkers(coworkers, readPinnedCoworkerIds());
+  return (pinned[0] ?? others[0])?.id ?? null;
+}
